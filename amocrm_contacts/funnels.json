@@ -1,0 +1,64 @@
+{
+  "funnels": [
+    {
+      "name": "Неразобранное",
+      "file": "status_41764741_Неразобранное.json",
+      "pipeline_id": 4524700,
+      "status_id": 41764741
+    },
+    {
+      "name": "из разных источников",
+      "file": "status_53398730_из_разных_источников.json",
+      "pipeline_id": 4524700,
+      "status_id": 53398730
+    },
+    {
+      "name": "Зеленка",
+      "file": "status_41793742_Зеленка.json",
+      "pipeline_id": 4524700,
+      "status_id": 41793742
+    },
+    {
+      "name": "Оборудование",
+      "file": "status_41764744_Оборудование.json",
+      "pipeline_id": 4524700,
+      "status_id": 41764744
+    },
+    {
+      "name": "Упаковка",
+      "file": "status_41818009_Упаковка.json",
+      "pipeline_id": 4524700,
+      "status_id": 41818009
+    },
+    {
+      "name": "ДРИПЫ",
+      "file": "status_65753602_ДРИПЫ.json",
+      "pipeline_id": 4524700,
+      "status_id": 65753602
+    },
+    {
+      "name": "Не квалифицированные",
+      "file": "status_65458470_Не_квалифицированные.json",
+      "pipeline_id": 4524700,
+      "status_id": 65458470
+    },
+    {
+      "name": "test",
+      "file": "status_78511958_test.json",
+      "pipeline_id": 4524700,
+      "status_id": 78511958
+    },
+    {
+      "name": "Успешно реализовано",
+      "file": "status_142_Успешно_реализовано.json",
+      "pipeline_id": 4524700,
+      "status_id": 142
+    },
+    {
+      "name": "Закрыто и не реализовано",
+      "file": "status_143_Закрыто_и_не_реализовано.json",
+      "pipeline_id": 4524700,
+      "status_id": 143
+    }
+  ]
+}
