@@ -387,19 +387,14 @@ def build_admin_rows():
 # tgbot.py
 # ---------- полностью замените функцию send_via_bot_py ----------
 
-async def send_via_bot_py(phone: str,
-                          params: list[str],
-                          template_id: str,
-                          funnel: str = "",
-                          lang: str = "ru"):
-    """
-    Запускает bot.py как подпроцесс и логирует результат.
-    """
+async def send_via_bot_py(phone: str, params: list[str],
+                          template_id: str, template_lang: str,
+                          funnel: str = ""):
     bot_script = BASE_DIR / "bot.py"
     payload    = json.dumps({
         "id":     template_id,
         "params": params,
-        "lang":   lang                   # <─ язык теперь передаём явно
+        "lang":   template_lang
     })
 
     proc = await asyncio.create_subprocess_exec(
@@ -409,20 +404,19 @@ async def send_via_bot_py(phone: str,
     )
     out, err = await proc.communicate()
 
-    # безопасное декодирование (чтобы не падать на «битых» байтах)
     safe = lambda b: b.decode(errors="replace").strip()
     out_txt, err_txt = safe(out), safe(err)
 
-    extra = {
+    log_rec = {
         "template": template_id,
         "funnel":   funnel,
         "sent":     proc.returncode == 0,
         "err":      err_txt,
-        "out":      out_txt,
+        "out":      out_txt
     }
-    (logger.info if proc.returncode == 0 else logger.error)(
-        "%s → return=%s", phone, proc.returncode, extra=extra
-    )
+    logger.log(logging.INFO if proc.returncode == 0 else logging.ERROR,
+               "%s → return=%s", phone, proc.returncode, extra=log_rec)
+
 
 
 
@@ -478,7 +472,9 @@ async def job_send_distribution(context):
         params = [data["1"], data["2"]]
 
         for phone in phones:
-            await send_via_bot_py(phone, params, job["template_id"])
+            await send_via_bot_py(phone, params,
+                      job["template_id"], job["template_lang"])
+
 
 
         scheduled_store.remove(lambda x: x["job_id"] == job["job_id"])
@@ -496,7 +492,8 @@ async def job_send_distribution(context):
 
 def schedule_job(run_at: datetime,
                  contacts_file: Path,
-                 template_id: str) -> str:
+                 template_id: str,
+                 template_lang: str) -> str:
     """
     Сохраняет задачу в scheduled.json и регистрирует её в SimpleJobQueue.
     Возвращает сгенерированный job_id.
@@ -507,7 +504,8 @@ def schedule_job(run_at: datetime,
         "job_id":      job_id,
         "run_at":      run_at.isoformat(),
         "contacts":    str(contacts_file),
-        "template_id": template_id          # ← добавлен новый ключ
+        "template_id": template_id,
+        "template_lang": template_lang      # ← новый ключ
     }
 
     #--- логируем для отладки
@@ -1022,7 +1020,8 @@ async def cb_tpl_confirm(query: CallbackQuery, state: FSMContext):
     example = meta.get("example", "")
 
     await state.update_data(new={"1": body, "2": example})
-    await state.update_data(chosen_tpl_id=tpl.get("id") or tpl.get("templateId"))
+    await state.update_data(chosen_tpl_id = tpl.get("id")  or tpl.get("templateId"),
+                        chosen_tpl_lang = tpl.get("language") or tpl.get("lang") or "ru")
     await query.message.edit_text(
         f"✏️ Введите текст для поля {{1}} (по умолчанию «{body}»):"
     )
@@ -1158,10 +1157,14 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
         await state.set_state(Form.STATE_MENU)
         return
 
-    template_id = data["chosen_tpl_id"]
+    template_id   = data["chosen_tpl_id"]
+    template_lang = data.get("chosen_tpl_lang", "ru")
+
     job_id = schedule_job(datetime.fromisoformat(data["run_at"]),
                         Path(data["contacts"]),
-                        template_id)
+                        template_id,
+                        template_lang)
+
 
 
     run_at = datetime.fromisoformat(data["run_at"])

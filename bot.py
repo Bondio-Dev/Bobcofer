@@ -50,12 +50,16 @@ def log_message(phone, success, response_text=""):
 
 # ---------- замените старые версии функций ----------
 
+# bot.py
+# ──────────────────────────────────────────────────────────
+# bot.py
+# ──────────────────────────────────────────────────────────
 def send_template(dest: str,
                   template_id: str,
                   params: list[str],
                   lang: str = "ru") -> tuple[int, str]:
     """
-    Отправляет шаблон WhatsApp через Gupshup.
+    Отправка шаблона WhatsApp через Gupshup.
     Возвращает (HTTP-код, тело ответа).
     """
     logging.debug("send_template → dest=%s, tpl_id=%s, params=%s, lang=%s",
@@ -65,9 +69,9 @@ def send_template(dest: str,
         "source": SOURCE_NUMBER,
         "destination": dest,
         "template": json.dumps({
-            "id": template_id,
-            "params": params,
-            "languageCode": lang          # <─ теперь переменная определена
+            "id":           template_id,
+            "params":       params,
+            "languageCode": lang         # ← теперь язык всегда указан
         }),
         "src.name": APP_NAME,
     }
@@ -90,44 +94,24 @@ def send_template(dest: str,
 
 def main():
     """
-    • python bot.py <phone> '{"id": "<tpl>", "params": ["1","2"], "lang": "ru"}'
-    • без аргументов → массовая рассылка по contacts.json
+    • python bot.py <phone> '{"id": "...", "params": ["1","2"], "lang": "ru"}'
+    • без аргументов  → массовая рассылка contacts.json
     """
-    # ---------- одиночная отправка ----------
-    if len(sys.argv) == 3:
+    if len(sys.argv) == 3:                                  # одиночная отправка
         phone = sys.argv[1]
         info  = json.loads(sys.argv[2])
         code, resp = send_template(
             phone,
             info["id"],
             info["params"],
-            info.get("lang", "ru")        # <─ вытаскиваем язык, если передан
+            info.get("lang", "ru")
         )
         print(f"{phone}: {code} → {resp}")
         sys.exit(0 if code == 202 else 1)
 
-    # ---------- массовый режим (язык = "ru") ----------
-    ...
-
-
-
-def main():
-    """
-    Режимы:
-      • python bot.py <phone> '{"id": "<tpl_id>", "params": ["1","2"]}'
-      • python bot.py            ➜ массовая рассылка contacts.json
-    """
-    if len(sys.argv) == 3:
-        phone = sys.argv[1]
-        info  = json.loads(sys.argv[2])     # {"id": ..., "params": [...]}
-        code, resp = send_template(phone, info["id"], info["params"])
-        print(f"{phone}: {code} → {resp}")
-        # возврат 0/1 пригодится tgbot для проверки
-        sys.exit(0 if code == 202 else 1)
-
-    # ---------------- массовый режим ----------------
+    # ---------------- массовый режим (язык = "ru") ----------------
     contacts = load_json("contacts.json")
-    data     = load_json("data.json")       # {"id": "...", "1": "...", "2": "..."}
+    data     = load_json("data.json")            # {"id": "...", "1": "...", "2": "..."}
     tpl_id   = data["id"]
     params   = [data["1"], data["2"]]
 
@@ -135,7 +119,7 @@ def main():
     logging.info("Start bulk send; contacts=%d, tpl=%s", len(contacts), tpl_id)
 
     for num in contacts:
-        code, _ = send_template(num, tpl_id, params)
+        code, _ = send_template(num, tpl_id, params, "ru")
         total_sent += 1
         if code == 202:
             successful += 1

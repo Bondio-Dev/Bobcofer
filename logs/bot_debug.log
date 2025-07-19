@@ -47,3 +47,31 @@
   "messageId": "ef2c9ec4-62fe-44de-8d65-450863382311",
   "status": "submitted"
 }
+2025-07-20 01:26:22,073 | DEBUG | send_template → dest=+79842739577, tpl_id=0fa5b78b-5926-4fcb-97dc-62384152a730, params=['тестер', 'тестируйте или нет'], lang=ru
+2025-07-20 01:26:22,077 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:26:22,624 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:26:22,625 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "b9c67176-aa0b-4cdb-9964-b79f8501ecf8",
+  "status": "submitted"
+}
+2025-07-20 01:26:23,129 | DEBUG | send_template → dest=+79111363436, tpl_id=0fa5b78b-5926-4fcb-97dc-62384152a730, params=['тестер', 'тестируйте или нет'], lang=ru
+2025-07-20 01:26:23,133 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:26:23,664 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:26:23,665 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "5bbc64e6-18e3-40f7-b997-113b91da9154",
+  "status": "submitted"
+}
+2025-07-20 01:33:04,557 | DEBUG | send_template → dest=+79842739577, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['Тот шаблон', 'еще не приняли'], lang=ru
+2025-07-20 01:33:04,565 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:33:05,533 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:33:05,533 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "4b289908-bf40-43b2-a1f6-c42bf60bdbdb",
+  "status": "submitted"
+}
+2025-07-20 01:33:06,081 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['Тот шаблон', 'еще не приняли'], lang=ru
+2025-07-20 01:33:06,085 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:33:06,645 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:33:06,646 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "b8005074-8c40-4c9b-8cfd-bc0c2036121c",
+  "status": "submitted"
+}
