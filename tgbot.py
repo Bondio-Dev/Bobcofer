@@ -382,13 +382,25 @@ def build_admin_rows():
 # ---------------------------------------------------------------------------
 # Отправка одного сообщения через bot.py + JSON-лог
 # ---------------------------------------------------------------------------
-async def send_via_bot_py(phone: str, params: list[str],
-                          template_id: str, funnel: str = ""):
+# tgbot.py
+# ──────────────────────────────────────────────────────────
+# tgbot.py
+# ---------- полностью замените функцию send_via_bot_py ----------
+
+async def send_via_bot_py(phone: str,
+                          params: list[str],
+                          template_id: str,
+                          funnel: str = "",
+                          lang: str = "ru"):
     """
-    Запускает bot.py в подпроцессе.
+    Запускает bot.py как подпроцесс и логирует результат.
     """
     bot_script = BASE_DIR / "bot.py"
-    payload = json.dumps({"id": template_id, "params": params})
+    payload    = json.dumps({
+        "id":     template_id,
+        "params": params,
+        "lang":   lang                   # <─ язык теперь передаём явно
+    })
 
     proc = await asyncio.create_subprocess_exec(
         sys.executable, str(bot_script), phone, payload,
@@ -397,16 +409,23 @@ async def send_via_bot_py(phone: str, params: list[str],
     )
     out, err = await proc.communicate()
 
+    # безопасное декодирование (чтобы не падать на «битых» байтах)
+    safe = lambda b: b.decode(errors="replace").strip()
+    out_txt, err_txt = safe(out), safe(err)
+
     extra = {
         "template": template_id,
-        "funnel": funnel,
-        "sent": proc.returncode == 0,
-        "err": err.decode().strip() if proc.returncode != 0 else "",
+        "funnel":   funnel,
+        "sent":     proc.returncode == 0,
+        "err":      err_txt,
+        "out":      out_txt,
     }
-    if proc.returncode == 0:
-        logger.info("Отправлено успешно", extra=extra)
-    else:
-        logger.error("Ошибка отправки", extra=extra)
+    (logger.info if proc.returncode == 0 else logger.error)(
+        "%s → return=%s", phone, proc.returncode, extra=extra
+    )
+
+
+
 
 
 
@@ -471,19 +490,41 @@ async def job_send_distribution(context):
         
 
 
-def schedule_job(run_at: datetime, contacts_file: Path) -> str:
+# tgbot.py
+# ──────────────────────────────────────────────────────────
+# ЗАМЕНИТЕ старую функцию schedule_job на эту
+
+def schedule_job(run_at: datetime,
+                 contacts_file: Path,
+                 template_id: str) -> str:
+    """
+    Сохраняет задачу в scheduled.json и регистрирует её в SimpleJobQueue.
+    Возвращает сгенерированный job_id.
+    """
     job_id = f"job_{uuid.uuid4().hex[:8]}"
+
     data = {
-        "job_id": job_id,
-        "run_at": run_at.isoformat(),
-        "contacts": str(contacts_file),
-        "template_id": template_id,     # ← новый ключ
+        "job_id":      job_id,
+        "run_at":      run_at.isoformat(),
+        "contacts":    str(contacts_file),
+        "template_id": template_id          # ← добавлен новый ключ
     }
+
+    #--- логируем для отладки
+    logger.debug(
+        "schedule_job → id=%s, run_at=%s, contacts=%s, tpl=%s",
+        job_id, run_at, contacts_file, template_id
+    )
+
     scheduled_store.append(data)
+
+    # регистрируем задачу в очереди
     asyncio.create_task(
         job_queue.run_once(job_send_distribution, run_at, data, job_id)
     )
+
     return job_id
+
 
 
 # ---------------------------------------------------------------------------

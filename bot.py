@@ -48,20 +48,26 @@ def log_message(phone, success, response_text=""):
     with open(f"logs/{LOG_FILE}", "a", encoding="utf-8") as f:
         f.write(log_entry)
 
-def send_template(dest: str, template_id: str, params: list[str]) -> tuple[int, str]:
+# ---------- замените старые версии функций ----------
+
+def send_template(dest: str,
+                  template_id: str,
+                  params: list[str],
+                  lang: str = "ru") -> tuple[int, str]:
     """
-    Отправляет выбранный шаблон на номер `dest`.
-    Возвращает (HTTP-код, текст ответа).
+    Отправляет шаблон WhatsApp через Gupshup.
+    Возвращает (HTTP-код, тело ответа).
     """
-    logging.debug("send_template → dest=%s, tpl_id=%s, params=%s",
-                  dest, template_id, params)
+    logging.debug("send_template → dest=%s, tpl_id=%s, params=%s, lang=%s",
+                  dest, template_id, params, lang)
 
     payload = {
         "source": SOURCE_NUMBER,
         "destination": dest,
         "template": json.dumps({
             "id": template_id,
-            "params": params
+            "params": params,
+            "languageCode": lang          # <─ теперь переменная определена
         }),
         "src.name": APP_NAME,
     }
@@ -72,7 +78,7 @@ def send_template(dest: str, template_id: str, params: list[str]) -> tuple[int, 
 
     try:
         r = requests.post(API_URL, data=payload, headers=headers, timeout=10)
-        success = r.status_code == 202      # 202 – принято Gupshup
+        success = r.status_code == 202
         log_message(dest, success, r.text)
         logging.debug("Gupshup HTTP %s → %s", r.status_code, r.text[:400])
         return r.status_code, r.text
@@ -80,6 +86,29 @@ def send_template(dest: str, template_id: str, params: list[str]) -> tuple[int, 
         log_message(dest, False, f"Error: {e}")
         logging.exception("⛔ Request failed")
         return 0, f"Error: {e}"
+
+
+def main():
+    """
+    • python bot.py <phone> '{"id": "<tpl>", "params": ["1","2"], "lang": "ru"}'
+    • без аргументов → массовая рассылка по contacts.json
+    """
+    # ---------- одиночная отправка ----------
+    if len(sys.argv) == 3:
+        phone = sys.argv[1]
+        info  = json.loads(sys.argv[2])
+        code, resp = send_template(
+            phone,
+            info["id"],
+            info["params"],
+            info.get("lang", "ru")        # <─ вытаскиваем язык, если передан
+        )
+        print(f"{phone}: {code} → {resp}")
+        sys.exit(0 if code == 202 else 1)
+
+    # ---------- массовый режим (язык = "ru") ----------
+    ...
+
 
 
 def main():

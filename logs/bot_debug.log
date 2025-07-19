@@ -1,0 +1,49 @@
+2025-07-20 00:56:44,166 | DEBUG | send_template → dest=+79842739577, tpl_id=0fa5b78b-5926-4fcb-97dc-62384152a730, params=['Тестер', 'Я проверяю но могу и не проверять']
+2025-07-20 00:56:44,170 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 00:56:44,762 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 00:56:44,763 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "a868bf84-84f6-4e84-8a99-06c5ad3d7a78",
+  "status": "submitted"
+}
+2025-07-20 01:02:05,935 | DEBUG | send_template → dest=+79842739577, tpl_id=0fa5b78b-5926-4fcb-97dc-62384152a730, params=['тестер', 'протестируйте, а можете и не тестировать мне то что']
+2025-07-20 01:02:05,939 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:02:06,668 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:02:06,668 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "e7939280-c345-46e4-bb7d-ad11a741d5f6",
+  "status": "submitted"
+}
+2025-07-20 01:02:07,172 | DEBUG | send_template → dest=+79111363436, tpl_id=0fa5b78b-5926-4fcb-97dc-62384152a730, params=['тестер', 'протестируйте, а можете и не тестировать мне то что']
+2025-07-20 01:02:07,176 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:02:07,761 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:02:07,762 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "d09adef7-af8c-4acc-b0c3-eac609699b1d",
+  "status": "submitted"
+}
+2025-07-20 01:02:48,298 | DEBUG | send_template → dest=+79842739577, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['1', '1']
+2025-07-20 01:02:48,301 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:02:48,841 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:02:48,842 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "7fae50af-8e25-434a-ab16-19ffa1b08705",
+  "status": "submitted"
+}
+2025-07-20 01:02:49,352 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['1', '1']
+2025-07-20 01:02:49,355 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:02:49,912 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:02:49,913 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "9ef5e6ae-fefa-49aa-a99a-f0c2bbb0a65a",
+  "status": "submitted"
+}
+2025-07-20 01:15:28,969 | DEBUG | send_template → dest=+79842739577, tpl_id=0fa5b78b-5926-4fcb-97dc-62384152a730, params=['тестер', 'тестируй свои тесты'], lang=ru
+2025-07-20 01:15:28,973 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:15:29,504 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:15:29,505 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "3d1b1f6c-82e4-4969-bbb4-3094785cda0c",
+  "status": "submitted"
+}
+2025-07-20 01:15:30,010 | DEBUG | send_template → dest=+79111363436, tpl_id=0fa5b78b-5926-4fcb-97dc-62384152a730, params=['тестер', 'тестируй свои тесты'], lang=ru
+2025-07-20 01:15:30,013 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 01:15:30,548 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 01:15:30,549 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "ef2c9ec4-62fe-44de-8d65-450863382311",
+  "status": "submitted"
+}
