@@ -1,0 +1,22 @@
+version: "2.4"
+
+services:
+  bobcofer-bot:
+    build: .
+    container_name: bobcofer-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Persist bot data directory
+      - ./data:/app/data
+      # Persist logs
+      - ./logs:/app/logs
+      # Persist scheduled tasks file
+      - ./scheduled.json:/app/scheduled.json
+      # Persist contacts
+      - ./contacts.json:/app/contacts.json
+      # Persist configuration (if you edit conf.json in host)
+      - ./conf.json:/app/conf.json
+      # Persist token file (if used)
+      - ./token.json:/app/token.json
