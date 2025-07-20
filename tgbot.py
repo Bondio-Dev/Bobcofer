@@ -107,51 +107,57 @@ def load_reports():
     """
     stats: dict[tuple[str, str], dict] = {}
 
-    # --- покопаемся в текстовом логе с номерами ---
     txt_path = BASE_DIR / "logs" / "delivery_logs.txt"
-    if txt_path.exists():
-        for line in txt_path.read_text(encoding="utf-8").splitlines():
-            # YYYY-MM-DD HH:MM:SS | phone | STATUS | rest
-            parts = [p.strip() for p in line.split("|", 3)]
-            if len(parts) < 3:
-                continue
-            date = parts[0].split()[0]
-            phone = parts[1]
-            status = parts[2]
-            error = parts[3] if len(parts) > 3 else ""
-            # шаблон узнаём из JSON-лога (ниже) – сюда пока «?»,
-            # потом заменим, если найдём точный id
-            key = (date, "?")
-            rec = stats.setdefault(key, {"total": 0, "ok": 0, "fail": 0, "bad": []})
+    if not txt_path.exists():
+        return stats
+
+    for line in txt_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+            
+        parts = [p.strip() for p in line.split("|")]
+        
+        # Пропускаем строки, которые не являются основными записями лога
+        # (например, части JSON-ответов)
+        if len(parts) < 5:
+            continue
+            
+        # НОВЫЙ ФОРМАТ: timestamp | phone | template_id | funnel | STATUS | response_text
+        try:
+            timestamp = parts[0]
+            phone = parts[1] 
+            template_id = parts[2] if parts[2] != "-" else "unknown"
+            funnel = parts[3] if parts[3] != "-" else ""
+            status = parts[4]
+            response_text = parts[5] if len(parts) > 5 else ""
+            
+            # Извлекаем дату
+            date = timestamp.split()[0]
+            
+            key = (date, template_id)
+            rec = stats.setdefault(key, {
+                "total": 0, 
+                "ok": 0, 
+                "fail": 0, 
+                "bad": []
+            })
+            
             rec["total"] += 1
+            
             if status == "SUCCESS":
                 rec["ok"] += 1
             else:
                 rec["fail"] += 1
-                rec["bad"].append((phone, error))
+                # Извлекаем краткое описание ошибки из response_text
+                error_msg = response_text[:100] if response_text else "Unknown error"
+                rec["bad"].append((phone, error_msg))
+                
+        except (IndexError, ValueError) as e:
+            # Логируем проблемные строки для отладки
+            logger.debug(f"Не удалось распарсить строку лога: {line[:100]}... Ошибка: {e}")
+            continue
 
-    # --- уточняем template_id и enrich ---
-    json_path = BASE_DIR / "bot.log"
-    if json_path.exists():
-        for raw in json_path.read_text(encoding="utf-8").splitlines():
-            try:
-                j = json.loads(raw)
-            except Exception:
-                continue
-            dt = j.get("time", "").split()[0]
-            tpl = j.get("template", "?")
-            phone = j.get("phone", "")
-            success = j.get("success", False)
-            key = (dt, tpl)
-            rec = stats.setdefault(key, {"total": 0, "ok": 0, "fail": 0, "bad": []})
-            rec["total"] += 0  # не увеличиваем, чтобы не дублировать
-            if not success:
-                rec["bad"].append((phone, j.get("error", "") or j.get("msg", "")))
-
-    # пересчитаем ok/fail если «total» == 0
-    for rec in stats.values():
-        if rec["total"] == 0:
-            rec["total"] = rec["ok"] + rec["fail"]
     return stats
 
 
@@ -172,7 +178,7 @@ class Form(StatesGroup):
     STATE_TEMPLATE_CONFIRM = State()
     STATE_TEMPLATE_NEW_1 = State()
     STATE_TEMPLATE_NEW_2 = State()
-    STATE_TEMPLATE_VIEW = State()          # просмотр шаблонов
+    STATE_TEMPLATE_VIEW = State()
     STATE_AUDIENCE = State()
     STATE_TIME_CHOOSE = State()
     STATE_TIME_INPUT = State()
@@ -180,6 +186,8 @@ class Form(StatesGroup):
     STATE_ADMIN_ADD = State()
     STATE_AMOCRM_INPUT = State()
     STATE_AMOCRM_FILENAME = State()
+    STATE_REPORT_LIST = State()      
+    STATE_REPORT_DETAIL = State()    
 
 # ---------------------------------------------------------------------------
 # AmoCRM manager

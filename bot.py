@@ -38,25 +38,33 @@ def load_json(path):
 from datetime import datetime
 
 def log_message(
-        phone: str,
-        success: bool,
-        response_text: str = "",
-        template_id: str = "",
-        funnel: str = ""
-    ):
+    phone: str,
+    success: bool,
+    response_text: str = "",
+    template_id: str = "",
+    funnel: str = ""
+):
     """
     Формат строки:
     YYYY-MM-DD HH:MM:SS | phone | template_id | funnel | SUCCESS/FAILED | <короткий ответ>
     """
-    ts      = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    status  = "SUCCESS" if success else "FAILED"
-    pieces  = [ts, phone, template_id or "-", funnel or "-", status]
-
-    if response_text:
-        pieces.append(response_text.replace("\n", " ")[:300])
-
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status = "SUCCESS" if success else "FAILED"
+    
+    # Убираем переносы строк и ограничиваем длину response_text
+    clean_response = response_text.replace("\n", " ").replace("\r", " ") if response_text else ""
+    clean_response = clean_response[:300]  # Обрезаем до 300 символов
+    
+    # Убеждаемся, что phone - это строка
+    phone_str = str(phone)
+    
+    pieces = [ts, phone_str, template_id or "-", funnel or "-", status]
+    
+    if clean_response:
+        pieces.append(clean_response)
+    
     line = " | ".join(pieces) + "\n"
-
+    
     os.makedirs("logs", exist_ok=True)
     with open("logs/delivery_logs.txt", "a", encoding="utf-8") as fh:
         fh.write(line)
