@@ -1,13 +1,34 @@
 # в самый верх tgbot.py (до остальных import-ов)
-import logging
-logging.basicConfig(
-    level=logging.DEBUG,
-    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-)
+import json, logging
+from datetime import datetime, timezone
+
+class JsonFormatter(logging.Formatter):
+    """
+    Пишет единичную запись в bot.log:
+    {
+        "time":     "2025-07-20 02:05:31",
+        "template": "<uuid-шаблона>",
+        "funnel":   "Новый клиент",
+        "phone":    "+7981…",
+        "success":  true,
+        "error":    "",
+        "msg":      "любое сообщение, переданное logger.*"
+    }
+    """
+    def format(self, record: logging.LogRecord) -> str:
+        log_record = {
+            "time": datetime.now(timezone.utc).replace(microsecond=0)
+                                              .isoformat(sep=' '),   # <- fix utcnow()
+            "template": getattr(record, "template", ""),
+            "funnel":   getattr(record, "funnel", ""),
+            "phone":    getattr(record, "phone", ""),     # добавили номер
+            "success":  getattr(record, "success", ""),   # единое поле OK/Fail
+            "error":    getattr(record, "err", ""),       # текст ошибки/исключения
+            "msg":      record.getMessage(),
+        }
+        return json.dumps(log_record, ensure_ascii=False)                   # (+)
 
 import asyncio
-import json
-import logging
 import os
 import re
 import sys
@@ -51,27 +72,87 @@ AMOCRM_DIR.mkdir(exist_ok=True)
 # ---------------------------------------------------------------------------
 # Логирование в формате JSON
 # ---------------------------------------------------------------------------
-import logging.handlers  # добавьте к существующим import-ам
+# ---------------------------------------------------------------------------
+# tgbot.py – УНИВЕРСАЛЬНЫЙ JSON-ФОРМАТТЕР
+# ---------------------------------------------------------------------------
 
-class JsonFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        log_record = {
-            "time": datetime.utcnow().replace(microsecond=0).isoformat(sep=' '),
-            "template": getattr(record, "template", ""),      # имя шаблона
-            "funnel": getattr(record, "funnel", ""),          # воронка / статус
-            "sent": getattr(record, "sent", ""),              # True / False
-            "error": getattr(record, "err", ""),              # текст ошибки
-            "msg": record.getMessage(),                       # свободное сообщение
-        }
-        return json.dumps(log_record, ensure_ascii=False)
+
 
 LOG_FILE = BASE_DIR / "bot.log"
 
 _json_handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
 _json_handler.setFormatter(JsonFormatter())
+# сразу после создания _json_handler
+_console = logging.StreamHandler()
+_console.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
+logging.basicConfig(level=logging.INFO, handlers=[_json_handler, _console])
 
-logging.basicConfig(level=logging.INFO, handlers=[_json_handler])
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# 5. Утилита чтения логов (bot.log + delivery_logs.txt)
+# ---------------------------------------------------------------------------
+def load_reports():
+    """
+    Возвращает структуру:
+    {
+        (date, template_id): {
+            "total": N,
+            "ok":    M,
+            "fail":  K,
+            "bad":  [(phone, error), ...]
+        },
+        ...
+    }
+    """
+    stats: dict[tuple[str, str], dict] = {}
+
+    # --- покопаемся в текстовом логе с номерами ---
+    txt_path = BASE_DIR / "logs" / "delivery_logs.txt"
+    if txt_path.exists():
+        for line in txt_path.read_text(encoding="utf-8").splitlines():
+            # YYYY-MM-DD HH:MM:SS | phone | STATUS | rest
+            parts = [p.strip() for p in line.split("|", 3)]
+            if len(parts) < 3:
+                continue
+            date = parts[0].split()[0]
+            phone = parts[1]
+            status = parts[2]
+            error = parts[3] if len(parts) > 3 else ""
+            # шаблон узнаём из JSON-лога (ниже) – сюда пока «?»,
+            # потом заменим, если найдём точный id
+            key = (date, "?")
+            rec = stats.setdefault(key, {"total": 0, "ok": 0, "fail": 0, "bad": []})
+            rec["total"] += 1
+            if status == "SUCCESS":
+                rec["ok"] += 1
+            else:
+                rec["fail"] += 1
+                rec["bad"].append((phone, error))
+
+    # --- уточняем template_id и enrich ---
+    json_path = BASE_DIR / "bot.log"
+    if json_path.exists():
+        for raw in json_path.read_text(encoding="utf-8").splitlines():
+            try:
+                j = json.loads(raw)
+            except Exception:
+                continue
+            dt = j.get("time", "").split()[0]
+            tpl = j.get("template", "?")
+            phone = j.get("phone", "")
+            success = j.get("success", False)
+            key = (dt, tpl)
+            rec = stats.setdefault(key, {"total": 0, "ok": 0, "fail": 0, "bad": []})
+            rec["total"] += 0  # не увеличиваем, чтобы не дублировать
+            if not success:
+                rec["bad"].append((phone, j.get("error", "") or j.get("msg", "")))
+
+    # пересчитаем ok/fail если «total» == 0
+    for rec in stats.values():
+        if rec["total"] == 0:
+            rec["total"] = rec["ok"] + rec["fail"]
+    return stats
 
 
 MENU_BUTTONS = [
@@ -79,7 +160,9 @@ MENU_BUTTONS = [
     ["Просмотр шаблонов"],
     ["Просмотр запланированных"],
     ["Просмотр админов"],
+    ["Просмотреть отчёты"],          
 ]
+
 
 # ---------------------------------------------------------------------------
 # States
@@ -230,7 +313,7 @@ class AmoCRMCategoryManager:
         return False
 
 
-mgr = AmoCRMCategoryManager()
+
 
 # ---------------------------------------------------------------------------
 from main import build_funnels_snapshot
@@ -380,22 +463,24 @@ def build_admin_rows():
 
 # ---------------------------------------------------------------------------
 # ---------------------------------------------------------------------------
-# Отправка одного сообщения через bot.py + JSON-лог
+# tgbot.py – асинхронная отправка одного номера через bot.py
 # ---------------------------------------------------------------------------
-# tgbot.py
-# ──────────────────────────────────────────────────────────
-# tgbot.py
-# ---------- полностью замените функцию send_via_bot_py ----------
-
-async def send_via_bot_py(phone: str, params: list[str],
-                          template_id: str, template_lang: str,
-                          funnel: str = ""):
+async def send_via_bot_py(
+        phone: str,
+        params: list[str],
+        template_id: str,
+        template_lang: str,
+        funnel: str = ""
+    ):
+    """
+    • Запускает bot.py как подпроцесс
+    • Ожидает завершения
+    • Пишет подробную JSON-запись (см. JsonFormatter выше)
+    """
     bot_script = BASE_DIR / "bot.py"
-    payload    = json.dumps({
-        "id":     template_id,
-        "params": params,
-        "lang":   template_lang
-    })
+    payload = json.dumps({"id": template_id,
+                          "params": params,
+                          "lang": template_lang})
 
     proc = await asyncio.create_subprocess_exec(
         sys.executable, str(bot_script), phone, payload,
@@ -403,19 +488,22 @@ async def send_via_bot_py(phone: str, params: list[str],
         stderr=asyncio.subprocess.PIPE,
     )
     out, err = await proc.communicate()
+    decode = lambda b: b.decode(errors="replace").strip()
 
-    safe = lambda b: b.decode(errors="replace").strip()
-    out_txt, err_txt = safe(out), safe(err)
-
-    log_rec = {
+    # ------- готовим структуру для logger --------
+    log_extra = {
         "template": template_id,
         "funnel":   funnel,
-        "sent":     proc.returncode == 0,
-        "err":      err_txt,
-        "out":      out_txt
+        "phone":    phone,
+        "success":  proc.returncode == 0,
+        "err":      decode(err),
     }
-    logger.log(logging.INFO if proc.returncode == 0 else logging.ERROR,
-               "%s → return=%s", phone, proc.returncode, extra=log_rec)
+    level = logging.INFO if proc.returncode == 0 else logging.ERROR
+    logger.log(level,
+               "%s → %s", phone,
+               "OK" if proc.returncode == 0 else f"ERR {proc.returncode}",
+               extra=log_extra)
+
 
 
 
@@ -581,6 +669,78 @@ async def handle_menu(message: Message, state: FSMContext):
         )
         return
 
+# ---------------------------------------------------------------------------
+# 6. Хендлеры просмотра отчётов
+# ---------------------------------------------------------------------------
+@router.message(Form.STATE_MENU, F.text == "Просмотреть отчёты")
+@admin_required
+async def show_reports(msg: Message, state: FSMContext):
+    stats = load_reports()
+    if not stats:
+        await msg.reply("📭 Отчётов пока нет.")
+        return
+
+    buttons = []
+    for (date, tpl) in sorted(stats):
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"📅 {date} • {tpl}",
+                callback_data=f"rep:{date}:{tpl}"
+            )
+        ])
+    await msg.reply(
+        "📊 Доступные отчёты:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    )
+    await state.update_data(reports=stats)
+    await state.set_state(Form.STATE_REPORT_LIST)
+
+@router.callback_query(F.data.startswith("rep:"))
+@admin_required
+async def cb_rep_detail(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+    _, date, tpl = query.data.split(":", 2)
+    stats: dict = (await state.get_data()).get("reports", {})
+    rec = stats.get((date, tpl))
+    if not rec:
+        await query.message.reply("❌ Отчёт не найден.")
+        return
+
+    txt = (f"🗓️ <b>{date}</b>\n"
+           f"📑 Шаблон: <code>{tpl}</code>\n\n"
+           f"✅ Успешно: {rec['ok']}\n"
+           f"❌ Ошибки:  {rec['fail']}")
+    kb = [
+        [InlineKeyboardButton(text="📋 Проблемные номера", callback_data=f"repbad:{date}:{tpl}")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="repback")]
+    ]
+    await query.message.edit_text(
+        txt,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+        parse_mode=ParseMode.HTML
+    )
+    await state.set_state(Form.STATE_REPORT_DETAIL)
+
+@router.callback_query(F.data.startswith("repbad:"))
+@admin_required
+async def cb_rep_bad(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+    _, date, tpl = query.data.split(":", 2)
+    stats: dict = (await state.get_data()).get("reports", {})
+    rec = stats.get((date, tpl))
+    if not rec or not rec["bad"]:
+        await query.message.reply("✅ Ошибок нет.")
+        return
+    lines = [f"{p} — {e[:100]}" for p, e in rec["bad"]]
+    await query.message.reply(
+        "🛑 Проблемные номера:\n" + "\n".join(lines)[:4000]
+    )
+
+@router.callback_query(F.data == "repback")
+@admin_required
+async def cb_rep_back(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+    await show_reports(query.message, state)
 
 # ---------------------------------------------------------------------------
 async def ask_audience(
@@ -1264,6 +1424,15 @@ async def cmd_cancel(message: Message, state: FSMContext):
     )
 
 
+async def warmup_amocrm():
+    global mgr
+    try:
+        mgr = await asyncio.to_thread(AmoCRMCategoryManager)   # не блокируем loop
+        logger.info("✅ AmoCRM готов")
+    except Exception as e:
+        mgr = None
+        logger.error("⚠️  AmoCRM недоступен: %s", e)
+
 # ---------------------------------------------------------------------------
 async def main():
     ensure_dirs()
@@ -1280,7 +1449,7 @@ async def main():
     dp.include_router(router)
 
     asyncio.create_task(job_queue.process_jobs())
-
+    asyncio.create_task(warmup_amocrm())        # 👈 новый фон-таск
     logger.info("🚀 Бот запущен.")
     await dp.start_polling(bot)
 

@@ -32,21 +32,35 @@ def load_json(path):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
-def log_message(phone, success, response_text=""):
-    """Простое логирование статуса отправки"""
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    status = "SUCCESS" if success else "FAILED"
-    
-    log_entry = f"{timestamp} | {phone} | {status}"
+# ---------------------------------------------------------------------------
+# bot.py – запись в текстовый delivery_logs.txt
+# ---------------------------------------------------------------------------
+from datetime import datetime
+
+def log_message(
+        phone: str,
+        success: bool,
+        response_text: str = "",
+        template_id: str = "",
+        funnel: str = ""
+    ):
+    """
+    Формат строки:
+    YYYY-MM-DD HH:MM:SS | phone | template_id | funnel | SUCCESS/FAILED | <короткий ответ>
+    """
+    ts      = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status  = "SUCCESS" if success else "FAILED"
+    pieces  = [ts, phone, template_id or "-", funnel or "-", status]
+
     if response_text:
-        log_entry += f" | {response_text}"
-    log_entry += "\n"
-    
-    # Создаем папку logs если её нет
+        pieces.append(response_text.replace("\n", " ")[:300])
+
+    line = " | ".join(pieces) + "\n"
+
     os.makedirs("logs", exist_ok=True)
-    
-    with open(f"logs/{LOG_FILE}", "a", encoding="utf-8") as f:
-        f.write(log_entry)
+    with open("logs/delivery_logs.txt", "a", encoding="utf-8") as fh:
+        fh.write(line)
+
 
 # ---------- замените старые версии функций ----------
 
@@ -54,24 +68,22 @@ def log_message(phone, success, response_text=""):
 # ──────────────────────────────────────────────────────────
 # bot.py
 # ──────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+# 8. send_template вызывает log_message с template_id
+# ---------------------------------------------------------------------------
 def send_template(dest: str,
                   template_id: str,
                   params: list[str],
                   lang: str = "ru") -> tuple[int, str]:
-    """
-    Отправка шаблона WhatsApp через Gupshup.
-    Возвращает (HTTP-код, тело ответа).
-    """
     logging.debug("send_template → dest=%s, tpl_id=%s, params=%s, lang=%s",
                   dest, template_id, params, lang)
-
     payload = {
         "source": SOURCE_NUMBER,
         "destination": dest,
         "template": json.dumps({
-            "id":           template_id,
-            "params":       params,
-            "languageCode": lang         # ← теперь язык всегда указан
+            "id": template_id,
+            "params": params,
+            "languageCode": lang,
         }),
         "src.name": APP_NAME,
     }
@@ -79,17 +91,17 @@ def send_template(dest: str,
         "apikey": API_KEY,
         "Content-Type": "application/x-www-form-urlencoded",
     }
-
     try:
         r = requests.post(API_URL, data=payload, headers=headers, timeout=10)
         success = r.status_code == 202
-        log_message(dest, success, r.text)
+        log_message(dest, success, r.text, template_id)   # 👈 передаём id шаблона
         logging.debug("Gupshup HTTP %s → %s", r.status_code, r.text[:400])
         return r.status_code, r.text
     except Exception as e:
-        log_message(dest, False, f"Error: {e}")
+        log_message(dest, False, f"Error: {e}", template_id)
         logging.exception("⛔ Request failed")
         return 0, f"Error: {e}"
+
 
 
 def main():
