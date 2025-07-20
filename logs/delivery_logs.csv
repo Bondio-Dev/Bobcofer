@@ -1,3 +1,4 @@
 timestamp,phone,template_id,funnel,status,response_info
-2025-07-20 18:43:00,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,-,SUCCESS,"{   ""messageId"": ""33651f5c-c0cb-4aff-b716-373a8026611d"",   ""status"": ""submitted"" }"
-2025-07-20 19:15:59,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,-,SUCCESS,"{   ""messageId"": ""fba70750-2dc1-4070-b8a3-4e746baa31dc"",   ""status"": ""submitted"" }"
+2025-07-21 01:38:10,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,-,SUCCESS,"{   ""messageId"": ""5db5c849-16bc-4b78-958c-fd2834bc7a04"",   ""status"": ""submitted"" }"
+2025-07-21 01:43:06,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,-,SUCCESS,"{   ""messageId"": ""2ef72207-2597-4009-bded-cc073a077159"",   ""status"": ""submitted"" }"
+2025-07-21 01:46:09,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,-,SUCCESS,"{   ""messageId"": ""303cd086-6f71-425d-85ce-48fb73d8f70a"",   ""status"": ""submitted"" }"

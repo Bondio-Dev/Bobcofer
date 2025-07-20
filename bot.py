@@ -116,7 +116,8 @@ def main():
             phone,
             info["id"],
             info["params"],
-            info.get("lang", "ru")
+            info.get("lang", "ru"),
+            
         )
         print(f"{phone}: {code} → {resp}")
         sys.exit(0 if code == 202 else 1)

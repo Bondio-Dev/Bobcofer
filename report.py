@@ -78,7 +78,7 @@ def generate_delivery_stats_report(
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(report)
 
-    return report_file
+    return report
 
 # --- Пример использования ---
 # Путь к отчёту:

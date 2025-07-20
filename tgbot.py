@@ -480,7 +480,7 @@ async def send_via_bot_py(
         params: list[str],
         template_id: str,
         template_lang: str,
-        funnel: str = ""
+        funnel = ""
     ):
     """
     • Запускает bot.py как подпроцесс
@@ -570,8 +570,8 @@ async def job_send_distribution(context):
         params = [data["1"], data["2"]]
 
         for phone in phones:
-            await send_via_bot_py(phone, params,
-                      job["template_id"], job["template_lang"])
+            await send_via_bot_py(phone=phone, params=params,
+                      template_id=job["template_id"], template_lang=job["template_lang"], funnel=job["job_id"]) 
 
 
 
@@ -660,6 +660,10 @@ async def handle_menu(message: Message, state: FSMContext):
         await view_templates(message, state)
         return
 
+    if text == "Просмотреть отчёты":           # <-- Добавляем эту ветку
+        await message.answer(generate_delivery_stats_report(date_from="2025-07-20", date_to="2025-07-21"))    # <-- Вызываем функцию
+        return
+
     if text == "Просмотр запланированных":
         rows = build_scheduled_rows()
         if not rows:
@@ -679,78 +683,119 @@ async def handle_menu(message: Message, state: FSMContext):
         )
         return
 
+    # опционально: обрабатывать неизвестные команды
+    await message.reply("❓ Команда не распознана, выберите опцию из меню.")
+
+
 # ---------------------------------------------------------------------------
 # 6. Хендлеры просмотра отчётов
 # ---------------------------------------------------------------------------
-@router.message(Form.STATE_MENU, F.text == "Просмотреть отчёты")
-@admin_required
-async def show_reports(msg: Message, state: FSMContext):
-    stats = load_reports()
-    if not stats:
-        await msg.reply("📭 Отчётов пока нет.")
+import csv
+import pandas as pd
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram import Bot, Dispatcher, types
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+
+LOG_FILE = 'logs/delivery_logs.csv'
+
+# 1) Функция показа списка отчётов
+async def show_reports(message: types.Message, state: FSMContext):
+    # Читаем CSV в DataFrame
+    df = pd.read_csv(LOG_FILE, parse_dates=['timestamp'])
+    if df.empty:
+        await message.reply("❌ Нет данных в логах.")
         return
 
+    # Извлекаем дату-время (без секунд) и группируем
+    df['run_time'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
+    groups = df.groupby(['run_time', 'template_id'], as_index=False).size()
+
+    # Получаем сопоставление template_id → название шаблона
+    # Предполагаем, что в state хранится tpl_map из fetch_templates
+    data = await state.get_data()
+    tpl_map = data.get('view_tpl_map', {})
+
+    # Формируем кнопки
     buttons = []
-    for (date, tpl) in sorted(stats):
-        buttons.append([
-            InlineKeyboardButton(
-                text=f"📅 {date} • {tpl}",
-                callback_data=f"rep:{date}:{tpl}"
-            )
-        ])
-    await msg.reply(
-        "📊 Доступные отчёты:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
-    )
-    await state.update_data(reports=stats)
+    for _, row in groups.iterrows():
+        rt = row['run_time']
+        tid = row['template_id']
+        title = tpl_map.get(tid, {}).get('name', tid)
+        text = f"{rt} | {title}"
+        callback = f"rep:{rt}:{tid}"
+        buttons.append([InlineKeyboardButton(text=text, callback_data=callback)])
+
+    # Кнопка “назад”
+    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="rep_back")])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await message.reply("📊 Отчёты рассылок:", reply_markup=keyboard)
     await state.set_state(Form.STATE_REPORT_LIST)
 
+
+# 2) Обработка клика по отчёту
 @router.callback_query(F.data.startswith("rep:"))
 @admin_required
-async def cb_rep_detail(query: CallbackQuery, state: FSMContext):
-    await query.answer()
-    _, date, tpl = query.data.split(":", 2)
-    stats: dict = (await state.get_data()).get("reports", {})
-    rec = stats.get((date, tpl))
-    if not rec:
-        await query.message.reply("❌ Отчёт не найден.")
-        return
+async def cb_report_detail(query: types.CallbackQuery, state: FSMContext):
+    try:
+        await query.answer()
+        parts = query.data.split(":", 2)
+        if len(parts) != 3:
+            await query.message.reply("❌ Некорректные данные отчёта.")
+            return
+            
+        _, run_time, template_id = parts
+        
+        # Читаем лог
+        df = pd.read_csv(LOG_FILE, parse_dates=['timestamp'])
+        df['run_time'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
+        
+        # Фильтруем по времени и template_id
+        filtered = df[(df['run_time'] == run_time) & (df['template_id'] == template_id)]
+        
+        if filtered.empty:
+            await query.message.reply("❌ Данные для этого периода не найдены.")
+            return
 
-    txt = (f"🗓️ <b>{date}</b>\n"
-           f"📑 Шаблон: <code>{tpl}</code>\n\n"
-           f"✅ Успешно: {rec['ok']}\n"
-           f"❌ Ошибки:  {rec['fail']}")
-    kb = [
-        [InlineKeyboardButton(text="📋 Проблемные номера", callback_data=f"repbad:{date}:{tpl}")],
-        [InlineKeyboardButton(text="⬅️ Назад", callback_data="repback")]
-    ]
-    await query.message.edit_text(
-        txt,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
-        parse_mode=ParseMode.HTML
-    )
-    await state.set_state(Form.STATE_REPORT_DETAIL)
+        total = len(filtered)
+        success = (filtered['status'] == 'SUCCESS').sum()
+        failed = total - success
 
-@router.callback_query(F.data.startswith("repbad:"))
+        # Получаем название шаблона
+        data = await state.get_data()
+        tpl_map = data.get('view_tpl_map', {})
+        template_name = "Неизвестный шаблон"
+        
+        for tid, tpl in tpl_map.items():
+            if tpl.get('id') == template_id or tpl.get('templateId') == template_id:
+                template_name = tpl.get('name', tpl.get('templateName', template_id))
+                break
+
+        # Отправляем отчёт
+        text = (
+            f"📅 Время: {run_time}\n"
+            f"📝 Шаблон: {template_name}\n"
+            f"📊 Всего отправлено: {total}\n"
+            f"✅ Успешно: {success}\n"
+            f"❌ Неудач: {failed}"
+        )
+        
+        await query.message.reply(text)
+        
+    except Exception as e:
+        logger.exception(f"Ошибка в cb_report_detail: {e}")
+        await query.message.reply("❌ Ошибка при получении деталей отчёта.")
+
+
+# 3) Колбэк “назад” из меню отчётов
+@router.callback_query(F.data == "rep_back")
 @admin_required
-async def cb_rep_bad(query: CallbackQuery, state: FSMContext):
+async def cb_report_back(query: types.CallbackQuery, state: FSMContext):
     await query.answer()
-    _, date, tpl = query.data.split(":", 2)
-    stats: dict = (await state.get_data()).get("reports", {})
-    rec = stats.get((date, tpl))
-    if not rec or not rec["bad"]:
-        await query.message.reply("✅ Ошибок нет.")
-        return
-    lines = [f"{p} — {e[:100]}" for p, e in rec["bad"]]
-    await query.message.reply(
-        "🛑 Проблемные номера:\n" + "\n".join(lines)[:4000]
-    )
+    await query.message.edit_text("🏠 Главное меню.")
+    await state.set_state(Form.STATE_MENU)
 
-@router.callback_query(F.data == "repback")
-@admin_required
-async def cb_rep_back(query: CallbackQuery, state: FSMContext):
-    await query.answer()
-    await show_reports(query.message, state)
 
 # ---------------------------------------------------------------------------
 async def ask_audience(

@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "job_id": "job_793b3663",
+    "run_at": "2025-07-20T22:34:00.000002+00:00",
+    "contacts": "C:\\work\\test\\twst1\\status_78511958_test_33f71957.json",
+    "template_id": "263ad3ff-a524-4d0f-94f5-b6d1a369f915",
+    "template_lang": "ru"
+  }
+]
