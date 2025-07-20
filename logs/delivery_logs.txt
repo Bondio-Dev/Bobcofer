@@ -1,2 +1,0 @@
-2025-07-20 03:33:14 | +79842739577 | 263ad3ff-a524-4d0f-94f5-b6d1a369f915 | - | SUCCESS | {   "messageId": "e68a8b49-9827-4452-bde5-d4af501b5c6b",   "status": "submitted" }
-2025-07-20 03:33:15 | +79111363436 | 263ad3ff-a524-4d0f-94f5-b6d1a369f915 | - | SUCCESS | {   "messageId": "6e963cf6-33df-478e-b1b9-dec178b20ff6",   "status": "submitted" }

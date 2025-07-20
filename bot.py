@@ -3,6 +3,7 @@ import json, time, sys, os
 import requests
 from datetime import datetime
 import logging
+import csv
 
 def setup_logger():
     """Единый DEBUG-лог в файл logs/bot_debug.log"""
@@ -25,8 +26,6 @@ APP_NAME       = "BOBCOFFER"
 TEMPLATE_ID    = "263ad3ff-a524-4d0f-94f5-b6d1a369f915"
 API_URL        = "https://api.gupshup.io/sm/api/v1/template/msg"
 
-# Файл для логов
-LOG_FILE = "delivery_logs.txt"
 
 def load_json(path):
     with open(path, encoding="utf-8") as f:
@@ -37,6 +36,7 @@ def load_json(path):
 # ---------------------------------------------------------------------------
 from datetime import datetime
 
+
 def log_message(
     phone: str,
     success: bool,
@@ -45,29 +45,21 @@ def log_message(
     funnel: str = ""
 ):
     """
-    Формат строки:
-    YYYY-MM-DD HH:MM:SS | phone | template_id | funnel | SUCCESS/FAILED | <короткий ответ>
+    Записывает строку лога в конец CSV-файла. Не создаёт файл и не пишет заголовки.
+    Предполагается, что файл logs/delivery_logs.csv уже существует и имеет правильные заголовки.
     """
+    log_file = "logs/delivery_logs.csv"
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     status = "SUCCESS" if success else "FAILED"
-    
-    # Убираем переносы строк и ограничиваем длину response_text
-    clean_response = response_text.replace("\n", " ").replace("\r", " ") if response_text else ""
-    clean_response = clean_response[:300]  # Обрезаем до 300 символов
-    
-    # Убеждаемся, что phone - это строка
     phone_str = str(phone)
-    
-    pieces = [ts, phone_str, template_id or "-", funnel or "-", status]
-    
-    if clean_response:
-        pieces.append(clean_response)
-    
-    line = " | ".join(pieces) + "\n"
-    
-    os.makedirs("logs", exist_ok=True)
-    with open("logs/delivery_logs.txt", "a", encoding="utf-8") as fh:
-        fh.write(line)
+    template_id = template_id or "-"
+    funnel = funnel or "-"
+    response_text = response_text.replace("\n", " ").replace("\r", " ") if response_text else ""
+    response_text = response_text[:300]
+
+    with open(log_file, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow([ts, phone_str, template_id, funnel, status, response_text])
 
 
 # ---------- замените старые версии функций ----------

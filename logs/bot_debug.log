@@ -1,14 +1,33 @@
-2025-07-20 03:33:14,070 | DEBUG | send_template → dest=+79842739577, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['1', '1'], lang=ru
-2025-07-20 03:33:14,077 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
-2025-07-20 03:33:14,684 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
-2025-07-20 03:33:14,686 | DEBUG | Gupshup HTTP 202 → {
-  "messageId": "e68a8b49-9827-4452-bde5-d4af501b5c6b",
+2025-07-20 17:28:34,700 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['Й23', '122'], lang=ru
+2025-07-20 17:28:34,702 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 17:28:35,383 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 17:28:35,383 | INFO | ====================
+2025-07-20 17:28:35,383 | INFO | <Response [202]>
+2025-07-20 17:28:35,384 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "5789f497-3494-4c6f-87af-ab8605077a97",
   "status": "submitted"
 }
-2025-07-20 03:33:15,201 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['1', '1'], lang=ru
-2025-07-20 03:33:15,204 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
-2025-07-20 03:33:15,731 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
-2025-07-20 03:33:15,732 | DEBUG | Gupshup HTTP 202 → {
-  "messageId": "6e963cf6-33df-478e-b1b9-dec178b20ff6",
+2025-07-20 18:15:00,299 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['445', '455'], lang=ru
+2025-07-20 18:15:00,302 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 18:15:01,108 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 18:20:00,344 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['Рр', '66'], lang=ru
+2025-07-20 18:20:00,347 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 18:20:01,324 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 18:20:01,325 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "7507a744-d44a-4820-b562-287b911e203c",
+  "status": "submitted"
+}
+2025-07-20 18:42:59,523 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['7', '7'], lang=ru
+2025-07-20 18:42:59,526 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 18:43:00,233 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 18:43:00,234 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "33651f5c-c0cb-4aff-b716-373a8026611d",
+  "status": "submitted"
+}
+2025-07-20 19:15:58,893 | DEBUG | send_template → dest=+79111363436, tpl_id=263ad3ff-a524-4d0f-94f5-b6d1a369f915, params=['2', '3'], lang=ru
+2025-07-20 19:15:58,895 | DEBUG | Starting new HTTPS connection (1): api.gupshup.io:443
+2025-07-20 19:15:59,619 | DEBUG | https://api.gupshup.io:443 "POST /sm/api/v1/template/msg HTTP/1.1" 202 82
+2025-07-20 19:15:59,620 | DEBUG | Gupshup HTTP 202 → {
+  "messageId": "fba70750-2dc1-4070-b8a3-4e746baa31dc",
   "status": "submitted"
 }

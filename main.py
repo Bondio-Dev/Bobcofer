@@ -11,6 +11,7 @@ import requests
 from itertools import islice
 import phonenumbers
 from pathlib import Path
+import csv
 
 class AmoCRMCategoryManager:
     """
@@ -201,6 +202,8 @@ def build_funnels_snapshot() -> dict:
         print(f"Ошибка при получении статусов воронки {TARGET_PIPELINE_ID}: {e}")
         
     return snapshot
+
+
 
 def console_test() -> None:
     """CLI: выводит данные в консоль, читает ввод пользователя."""

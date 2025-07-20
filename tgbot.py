@@ -1,6 +1,8 @@
 # в самый верх tgbot.py (до остальных import-ов)
 import json, logging
 from datetime import datetime, timezone
+import csv
+from report import generate_delivery_stats_report
 
 class JsonFormatter(logging.Formatter):
     """
@@ -1025,10 +1027,17 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
                         phone = mgr.extract_phone(
                             co.get("custom_fields_values", [])
                         )
+                        if phone:
+                            contact_name = co.get("name", "")
                         normalized = mgr.normalize_phone(phone)
                         if normalized:
                             phones.append(normalized)
                             break
+                        else:
+                            error_file = 'logs/Error_numbers.csv'
+                            with open(error_file, mode='a', newline='', encoding='utf-8') as f:
+                                writer = csv.writer(f)
+                                writer.writerow([lead['id'], lead['name'], phone, contact_name])
 
                 phones = list(dict.fromkeys(phones))
                 
@@ -1451,6 +1460,30 @@ async def main():
         logger.exception("Ошибка чтения token.json")
         raise RuntimeError("Проверьте содержимое token.json")
 
+    # Путь к файлу с ошибочными номерами
+    error_file = 'logs/Error_numbers.csv'
+    os.makedirs('logs', exist_ok=True)
+
+    # Пишем заголовки, если файл не существует или пуст
+    if not os.path.exists(error_file) or os.path.getsize(error_file) == 0:
+        with open(error_file, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['lead_id', 'lead_name', 'phone', 'contact_name'])
+
+    # Заголовки для логов доставки
+    HEADERS = ["timestamp", "phone", "template_id", "funnel", "status", "response_info"]
+
+    log_file = 'logs/delivery_logs.csv'
+    os.makedirs('logs', exist_ok=True)
+
+    # Пишем заголовки, если файл не существует или пуст
+    if not os.path.exists(log_file) or os.path.getsize(log_file) == 0:
+        with open(log_file, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(HEADERS)
+
+    generate_delivery_stats_report(date_from="2025-07-20", date_to="2025-07-21")
+
     bot = Bot(token=token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
@@ -1464,3 +1497,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
