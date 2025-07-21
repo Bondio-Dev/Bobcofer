@@ -471,9 +471,9 @@ def admin_required(func):
         )
         if user_id not in admins_store.read():
             if isinstance(message_or_query, CallbackQuery):
-                await message_or_query.message.reply_text("❌ Доступ запрещён.")
+                await message_or_query.message.reply_text(f"❌ Доступ запрещён. Ваш ID: {user_id}")
             else:
-                await message_or_query.reply("❌ Доступ запрещён.")
+                await message_or_query.reply(f"❌ Доступ запрещён. Ваш ID: {user_id}")
             return
         return await func(message_or_query, state)
     return wrapper
@@ -538,6 +538,7 @@ def build_admin_rows():
     )
     return rows
 
+
 # ---------------------------------------------------------------------------
 class SimpleJobQueue:
     def __init__(self):
@@ -571,6 +572,9 @@ class SimpleJobQueue:
             await asyncio.sleep(10)
 
 job_queue = SimpleJobQueue()
+
+#-----------------
+
 
 # ---------------------------------------------------------------------------
 # ИЗМЕНЕННАЯ ФУНКЦИЯ: используем прямой вызов вместо subprocess
@@ -686,9 +690,10 @@ async def handle_menu(message: Message, state: FSMContext):
         await view_templates(message, state)
         return
 
-    if text == "Просмотреть отчёты": # <-- Добавляем эту ветку
-        await message.answer(generate_delivery_stats_report(date_from="2025-07-20", date_to="2025-07-21")) # <-- Вызываем функцию
+    if text == "Просмотреть отчёты":
+        await show_reports(message, state)
         return
+
 
     if text == "Просмотр запланированных":
         rows = build_scheduled_rows()
@@ -720,89 +725,190 @@ LOG_FILE = 'logs/delivery_logs.csv'
 
 # 1) Функция показа списка отчётов
 async def show_reports(message: Message, state: FSMContext):
-    # Читаем CSV в DataFrame
-    df = pd.read_csv(LOG_FILE, parse_dates=['timestamp'])
-    if df.empty:
-        await message.reply("❌ Нет данных в логах.")
-        return
-
-    # Извлекаем дату-время (без секунд) и группируем
-    df['run_time'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
-    groups = df.groupby(['run_time', 'template_id'], as_index=False).size()
-
-    # Получаем сопоставление template_id → название шаблона
-    # Предполагаем, что в state хранится tpl_map из fetch_templates
-    data = await state.get_data()
-    tpl_map = data.get('view_tpl_map', {})
-
-    # Формируем кнопки
-    buttons = []
-    for _, row in groups.iterrows():
-        rt = row['run_time']
-        tid = row['template_id']
-        title = tpl_map.get(tid, {}).get('name', tid)
-        text = f"{rt} | {title}"
-        callback = f"rep:{rt}:{tid}"
-        buttons.append([InlineKeyboardButton(text=text, callback_data=callback)])
-
-    # Кнопка "назад"
-    buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="rep_back")])
-
-    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.reply("📊 Отчёты рассылок:", reply_markup=keyboard)
-    await state.set_state(Form.STATE_REPORT_LIST)
-
-# 2) Обработка клика по отчёту
-@router.callback_query(F.data.startswith("rep:"))
-@admin_required
-async def cb_report_detail(query: CallbackQuery, state: FSMContext):
+    """
+    Показывает список всех отправок, сгруппированных по уникальному funnel ID.
+    Каждая кнопка представляет отдельную рассылку.
+    """
     try:
-        await query.answer()
-        parts = query.data.split(":", 2)
-        if len(parts) != 3:
-            await query.message.reply("❌ Некорректные данные отчёта.")
+        # Читаем CSV в DataFrame
+        df = pd.read_csv(LOG_FILE, parse_dates=['timestamp'])
+        if df.empty:
+            await message.reply("❌ Нет данных в логах.")
             return
 
-        _, run_time, template_id = parts
+        # Группируем по funnel (уникальный ID отправки)
+        funnel_stats = {}
+        
+        for funnel, group in df.groupby('funnel'):
+            min_time = group['timestamp'].min()
+            max_time = group['timestamp'].max()
+            total_count = len(group)
+            success_count = (group['status'] == 'SUCCESS').sum()
+            unique_phones = group['phone'].nunique()
+            template_id = group['template_id'].iloc[0]  # Берем первый template_id
+            
+            # Определяем тип отправки
+            if funnel == '-':
+                display_name = f"Ручная отправка ({min_time.strftime('%H:%M')})"
+            else:
+                display_name = f"Рассылка {funnel.replace('job_', '')} ({min_time.strftime('%H:%M')})"
+            
+            funnel_stats[funnel] = {
+                'display_name': display_name,
+                'min_time': min_time,
+                'max_time': max_time,
+                'total': total_count,
+                'success': success_count,
+                'unique_phones': unique_phones,
+                'template_id': template_id
+            }
+
+        # Сортируем по времени (от новых к старым)
+        sorted_funnels = sorted(funnel_stats.items(), 
+                              key=lambda x: x[1]['min_time'], 
+                              reverse=True)
+
+        # Формируем кнопки
+        buttons = []
+        for funnel, stats in sorted_funnels:
+            text = f"{stats['display_name']} ({stats['success']}/{stats['total']})"
+            callback = f"funnel_rep:{funnel}"
+            buttons.append([InlineKeyboardButton(text=text, callback_data=callback)])
+
+        # Кнопка "назад"
+        buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="rep_back")])
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        await message.reply("📊 Отчёты по рассылкам:", reply_markup=keyboard)
+        await state.set_state(Form.STATE_REPORT_LIST)
+
+    except Exception as e:
+        logger.exception(f"Ошибка в show_reports: {e}")
+        await message.reply("❌ Ошибка при загрузке отчетов.")
+
+
+
+# 2) Обработка клика по отчёту
+@router.callback_query(F.data.startswith("funnel_rep:"))
+@admin_required
+async def cb_funnel_report_detail(query: CallbackQuery, state: FSMContext):
+    """
+    Показывает детальную статистику по конкретной отправке (funnel).
+    """
+    try:
+        await query.answer()
+        funnel = query.data.split(":", 1)[1]
 
         # Читаем лог
         df = pd.read_csv(LOG_FILE, parse_dates=['timestamp'])
-        df['run_time'] = df['timestamp'].dt.strftime('%Y-%m-%d %H:%M')
-
-        # Фильтруем по времени и template_id
-        filtered = df[(df['run_time'] == run_time) & (df['template_id'] == template_id)]
+        
+        # Фильтруем по funnel
+        filtered = df[df['funnel'] == funnel]
 
         if filtered.empty:
-            await query.message.reply("❌ Данные для этого периода не найдены.")
+            await query.message.reply("❌ Данные для этой отправки не найдены.")
             return
 
+        # Собираем статистику
+        min_time = filtered['timestamp'].min()
+        max_time = filtered['timestamp'].max()
         total = len(filtered)
         success = (filtered['status'] == 'SUCCESS').sum()
         failed = total - success
+        unique_phones = filtered['phone'].nunique()
+        template_id = filtered['template_id'].iloc[0]
+        
+        # Список телефонов с результатами
+        phone_results = []
+        for _, row in filtered.iterrows():
+            phone = f"+{int(row['phone'])}"  # Конвертируем научную нотацию
+            status = "✅" if row['status'] == 'SUCCESS' else "❌"
+            phone_results.append(f"{status} {phone}")
 
-        # Получаем название шаблона
-        data = await state.get_data()
-        tpl_map = data.get('view_tpl_map', {})
-        template_name = "Неизвестный шаблон"
-        for tid, tpl in tpl_map.items():
-            if tpl.get('id') == template_id or tpl.get('templateId') == template_id:
-                template_name = tpl.get('name', tpl.get('templateName', template_id))
-                break
+        # Определяем тип отправки
+        if funnel == '-':
+            funnel_display = "Ручная отправка"
+        else:
+            funnel_display = f"Рассылка {funnel.replace('job_', '')}"
 
-        # Отправляем отчёт
+        # Формируем сообщение с детальной статистикой
+        duration = (max_time - min_time).total_seconds()
+        if duration > 0:
+            time_info = f"📅 Период: {min_time.strftime('%d.%m %H:%M:%S')} - {max_time.strftime('%H:%M:%S')}"
+        else:
+            time_info = f"📅 Время: {min_time.strftime('%d.%m.%Y %H:%M:%S')}"
+
         text = (
-            f"📅 Время: {run_time}\n"
-            f"📝 Шаблон: {template_name}\n"
+            f"📋 {funnel_display}\n"
+            f"{time_info}\n"
+            f"🆔 Template ID: {template_id[:8]}...\n"
             f"📊 Всего отправлено: {total}\n"
             f"✅ Успешно: {success}\n"
-            f"❌ Неудач: {failed}"
+            f"❌ Неудач: {failed}\n"
+            f"📱 Уникальных номеров: {unique_phones}\n\n"
+            f"📞 Детали доставки:\n" + "\n".join(phone_results)
         )
 
-        await query.message.reply(text)
+        # Если сообщение слишком длинное, обрезаем список номеров
+        if len(text) > 4000:
+            phone_results_short = phone_results[:10]
+            if len(phone_results) > 10:
+                phone_results_short.append(f"... и еще {len(phone_results) - 10} номеров")
+            
+            text = (
+                f"📋 {funnel_display}\n"
+                f"{time_info}\n"
+                f"🆔 Template ID: {template_id[:8]}...\n"
+                f"📊 Всего отправлено: {total}\n"
+                f"✅ Успешно: {success}\n"
+                f"❌ Неудач: {failed}\n"
+                f"📱 Уникальных номеров: {unique_phones}\n\n"
+                f"📞 Первые 10 номеров:\n" + "\n".join(phone_results_short)
+            )
+
+        # Кнопки навигации
+        buttons = [
+            [InlineKeyboardButton(text="⬅️ К списку отчетов", callback_data="back_to_reports")],
+            [InlineKeyboardButton(text="🏠 В главное меню", callback_data="rep_back")]
+        ]
+
+        keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+        await query.message.edit_text(text, reply_markup=keyboard)
 
     except Exception as e:
-        logger.exception(f"Ошибка в cb_report_detail: {e}")
+        logger.exception(f"Ошибка в cb_funnel_report_detail: {e}")
         await query.message.reply("❌ Ошибка при получении деталей отчёта.")
+
+# 4. НОВЫЙ обработчик для возврата к списку отчетов (добавить к роутерам)
+@router.callback_query(F.data == "back_to_reports")
+@admin_required
+async def cb_back_to_reports(query: CallbackQuery, state: FSMContext):
+    """
+    Возвращает к списку отчетов.
+    """
+    await query.answer()
+    # Используем существующую функцию, но вызываем через query.message
+    message_like = type('MockMessage', (), {
+        'reply': query.message.edit_text
+    })()
+    await show_reports(message_like, state)
+
+
+# 5. Убедитесь, что в роутерах есть эти обработчики:
+"""
+Добавить в роутеры (после существующих обработчиков отчетов):
+
+@router.callback_query(F.data.startswith("funnel_rep:"))
+@admin_required
+async def cb_funnel_report_detail(query: CallbackQuery, state: FSMContext):
+    # код функции выше
+
+@router.callback_query(F.data == "back_to_reports")
+@admin_required  
+async def cb_back_to_reports(query: CallbackQuery, state: FSMContext):
+    # код функции выше
+"""
+
 
 # 3) Колбэк "назад" из меню отчётов
 @router.callback_query(F.data == "rep_back")
@@ -1501,6 +1607,140 @@ async def warmup_amocrm():
     except Exception as e:
         mgr = None
         logger.error("⚠️ AmoCRM недоступен: %s", e)
+#--------------
+
+
+# Обработчики для управления админами
+
+@router.callback_query(F.data == "adm_add")
+@admin_required
+async def cb_admin_add(query: CallbackQuery, state: FSMContext):
+    """Начало процесса добавления нового админа"""
+    await query.answer()
+    await query.message.edit_text(
+        "👤 Введите ID пользователя, которого хотите добавить в админы:",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="❌ Отмена", callback_data="admin_cancel")]
+            ]
+        )
+    )
+    await state.set_state(Form.STATE_ADMIN_ADD)
+
+@router.callback_query(F.data.startswith("adm_detail:"))
+@admin_required  
+async def cb_admin_detail(query: CallbackQuery, state: FSMContext):
+    """Показ деталей конкретного админа"""
+    await query.answer()
+    admin_id = int(query.data.split(":", 1)[1])
+    
+    buttons = [
+        [InlineKeyboardButton(text="🗑️ Удалить", callback_data=f"admin_delete:{admin_id}")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_back")]
+    ]
+    
+    await query.message.edit_text(
+        f"👤 Администратор: {admin_id}",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+    )
+
+@router.message(Form.STATE_ADMIN_ADD)
+@admin_required
+async def handle_admin_add_input(message: Message, state: FSMContext):
+    """Обработка ввода ID нового админа"""
+    try:
+        user_id = int(message.text.strip())
+        admins = admins_store.read()
+        
+        if user_id in admins:
+            await message.reply(
+                f"❌ Пользователь {user_id} уже является админом.",
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[
+                        [InlineKeyboardButton(text="🏠 В главное меню", callback_data="admin_to_menu")]
+                    ]
+                )
+            )
+            return
+            
+        admins_store.append(user_id)
+        await message.reply(
+            f"✅ Пользователь {user_id} добавлен в админы.",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="🏠 В главное меню", callback_data="admin_to_menu")]
+                ]
+            )
+        )
+        await state.set_state(Form.STATE_MENU)
+        
+    except ValueError:
+        await message.reply(
+            "❌ Некорректный ID. Введите числовой ID пользователя:",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="❌ Отмена", callback_data="admin_cancel")]
+                ]
+            )
+        )
+
+@router.callback_query(F.data.startswith("admin_delete:"))
+@admin_required
+async def cb_admin_delete(query: CallbackQuery, state: FSMContext):
+    """Удаление админа"""
+    await query.answer()
+    admin_id = int(query.data.split(":", 1)[1])
+    
+    # Проверяем, что это не единственный админ
+    admins = admins_store.read()
+    if len(admins) <= 1:
+        await query.message.edit_text(
+            "❌ Нельзя удалить единственного администратора.",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="⬅️ Назад", callback_data="admin_back")]
+                ]
+            )
+        )
+        return
+    
+    admins_store.remove(lambda x: x == admin_id)
+    await query.message.edit_text(
+        f"✅ Администратор {admin_id} удален.",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🏠 В главное меню", callback_data="admin_to_menu")]
+            ]
+        )
+    )
+    await state.set_state(Form.STATE_MENU)
+
+@router.callback_query(F.data == "admin_cancel")
+@admin_required
+async def cb_admin_cancel(query: CallbackQuery, state: FSMContext):
+    """Отмена операции с админами"""
+    await query.answer()
+    await query.message.edit_text("❌ Действие отменено.")
+    await state.set_state(Form.STATE_MENU)
+
+@router.callback_query(F.data == "admin_back")
+@admin_required
+async def cb_admin_back(query: CallbackQuery, state: FSMContext):
+    """Возврат к списку админов"""
+    await query.answer()
+    rows = build_admin_rows()
+    await query.message.edit_text(
+        "🛡️ Администраторы:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=rows)
+    )
+
+@router.callback_query(F.data == "admin_to_menu")
+@admin_required
+async def cb_admin_to_menu(query: CallbackQuery, state: FSMContext):
+    """Переход в главное меню"""
+    await query.answer()
+    await query.message.edit_text("🏠 Главное меню.")
+    await state.set_state(Form.STATE_MENU)
 
 # ---------------------------------------------------------------------------
 async def main():
