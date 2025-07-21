@@ -405,17 +405,36 @@ async def get_session() -> aiohttp.ClientSession:
 # ---------------------------------------------------------------------------
 # Обновляем список воронок: чистим папку и пишем funnels.json
 async def update_amocrm_funnels() -> str:
-    try:
-        for f in AMOCRM_DIR.glob("*.json"):
-            try:
-                f.unlink()
-            except Exception:
-                logger.warning("Не смог удалить %s", f)
-        snap = build_funnels_snapshot()
-        return f"✅ Снято {len(snap['funnels'])} воронок, контакты очищены."
-    except Exception as e:
-        logger.exception("update_amocrm_funnels failed")
-        return f"❌ Ошибка: {e}"
+    attempt = 0
+    max_attempts = 3
+    pause_seconds = 10
+    
+    # Чистим папку один раз в начале
+    for f in AMOCRM_DIR.glob("*.json"):
+        try:
+            f.unlink()
+        except Exception:
+            logger.warning("Не смог удалить %s", f)
+    
+    # Цикл с повторными попытками
+    while attempt < max_attempts:
+        try:
+            snap = await asyncio.to_thread(build_funnels_snapshot)
+            return f"✅ Снято {len(snap['funnels'])} воронок, контакты очищены."
+        except Exception as e:
+            attempt += 1
+            logger.exception(f"build_funnels_snapshot попытка {attempt}/{max_attempts} неудачна: %s", e)
+            
+            if attempt < max_attempts:
+                logger.info(f"Пауза {pause_seconds} секунд перед следующей попыткой...")
+                await asyncio.sleep(pause_seconds)
+            else:
+                logger.error("Все попытки подключения к AmoCRM исчерпаны")
+                return "❌ Сервер AmoCRM не отвечает, попробуйте снова через несколько минут"
+    
+    # Этот код никогда не должен выполниться, но на всякий случай
+    return "❌ Неожиданная ошибка при обновлении воронок"
+
 
 class JsonStore:
     def __init__(self, path: Path):
@@ -954,6 +973,38 @@ async def cb_view_tpl(query: CallbackQuery, state: FSMContext):
     await state.set_state(Form.STATE_TEMPLATE_VIEW)
 
 # ---------------------------------------------------------------------------
+
+def write_error_with_phone_check(lead_id, lead_name, phone, contact_name):
+    """Простая проверка: если номер уже есть в файле - не записываем"""
+    error_file = 'logs/Error_numbers.csv'
+    
+    # Читаем существующие номера телефонов
+    existing_phones = set()
+    try:
+        if os.path.exists(error_file) and os.path.getsize(error_file) > 0:
+            with open(error_file, mode='r', encoding='utf-8') as f:
+                reader = csv.reader(f)
+                next(reader, None)  # пропускаем заголовок
+                for row in reader:
+                    if len(row) >= 3:  # проверяем что есть колонка phone (3-я колонка)
+                        existing_phones.add(row[2])
+    except Exception:
+        pass  # если не можем прочитать, продолжаем
+    
+    # Если номер уже есть - не записываем
+    if str(phone) in existing_phones:
+        return False  # номер уже существует, не записали
+    
+    # Записываем в файл только если номера еще нет
+    with open(error_file, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow([lead_id, lead_name, phone, contact_name])
+    
+    return True  # номер записан
+
+
+
+
 @router.callback_query(F.data.startswith(("aud:",)))
 @admin_required
 async def cb_audience(query: CallbackQuery, state: FSMContext):
@@ -1045,17 +1096,15 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
                         )
                         if phone:
                             contact_name = co.get("name", "")
-                            normalized = mgr.normalize_phone(phone)
-                            if normalized:
-                                phones.append(normalized)
-                                break
+                        normalized = mgr.normalize_phone(phone)
+                        if normalized:
+                            phones.append(normalized)
+                            
                         else:
-                            error_file = 'logs/Error_numbers.csv'
-                            with open(error_file, mode='a', newline='', encoding='utf-8') as f:
-                                writer = csv.writer(f)
-                                writer.writerow([lead['id'], lead['name'], phone, contact_name])
+                            write_error_with_phone_check(lead['id'], lead['name'], phone, contact_name)
 
                 phones = list(dict.fromkeys(phones))
+                
                 local.write_text(
                     json.dumps(phones, ensure_ascii=False), "utf-8"
                 )

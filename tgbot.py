@@ -1077,7 +1077,7 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
                         normalized = mgr.normalize_phone(phone)
                         if normalized:
                             phones.append(normalized)
-                            break
+                            
                         else:
                             error_file = 'logs/Error_numbers.csv'
                             with open(error_file, mode='a', newline='', encoding='utf-8') as f:
