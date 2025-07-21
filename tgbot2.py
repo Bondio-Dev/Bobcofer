@@ -724,6 +724,7 @@ import pandas as pd
 LOG_FILE = 'logs/delivery_logs.csv'
 
 # 1) Функция показа списка отчётов
+# 1) Функция показа списка отчётов
 async def show_reports(message: Message, state: FSMContext):
     """
     Показывает список всех отправок, сгруппированных по уникальному funnel ID.
@@ -738,44 +739,43 @@ async def show_reports(message: Message, state: FSMContext):
 
         # Группируем по funnel (уникальный ID отправки)
         funnel_stats = {}
-        
+
         for funnel, group in df.groupby('funnel'):
+            # Берём минимальную метку времени для даты
             min_time = group['timestamp'].min()
-            max_time = group['timestamp'].max()
+
+            # ❶ Формируем метку только с датой и годом «ДД.MM.YYYY»
+            date_label = min_time.strftime('%d.%m.%Y')
+
+            # Счётчики
             total_count = len(group)
             success_count = (group['status'] == 'SUCCESS').sum()
-            unique_phones = group['phone'].nunique()
-            template_id = group['template_id'].iloc[0]  # Берем первый template_id
-            
-            # Определяем тип отправки
-            if funnel == '-':
-                display_name = f"Ручная отправка ({min_time.strftime('%H:%M')})"
-            else:
-                display_name = f"Рассылка {funnel.replace('job_', '')} ({min_time.strftime('%H:%M')})"
-            
+
+            # Итоговая подпись: «Дата – успешно/всего»
+            display_name = f"{date_label} – {success_count}/{total_count}"
+
             funnel_stats[funnel] = {
                 'display_name': display_name,
                 'min_time': min_time,
-                'max_time': max_time,
                 'total': total_count,
                 'success': success_count,
-                'unique_phones': unique_phones,
-                'template_id': template_id
             }
 
         # Сортируем по времени (от новых к старым)
-        sorted_funnels = sorted(funnel_stats.items(), 
-                              key=lambda x: x[1]['min_time'], 
-                              reverse=True)
+        sorted_funnels = sorted(
+            funnel_stats.items(),
+            key=lambda x: x[1]['min_time'],
+            reverse=True
+        )
 
         # Формируем кнопки
         buttons = []
         for funnel, stats in sorted_funnels:
-            text = f"{stats['display_name']} ({stats['success']}/{stats['total']})"
+            text = stats['display_name']
             callback = f"funnel_rep:{funnel}"
             buttons.append([InlineKeyboardButton(text=text, callback_data=callback)])
 
-        # Кнопка "назад"
+        # Кнопка «назад»
         buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="rep_back")])
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -784,7 +784,7 @@ async def show_reports(message: Message, state: FSMContext):
 
     except Exception as e:
         logger.exception(f"Ошибка в show_reports: {e}")
-        await message.reply("❌ Ошибка при загрузке отчетов.")
+        await message.reply("❌ Ошибка при загрузке отчётов.")
 
 
 
@@ -838,16 +838,22 @@ async def cb_funnel_report_detail(query: CallbackQuery, state: FSMContext):
         else:
             time_info = f"📅 Время: {min_time.strftime('%d.%m.%Y %H:%M:%S')}"
 
+        headline = (
+            f"📅 {min_time.strftime('%d.%m %H:%M')} → "
+            f"{max_time.strftime('%H:%M')}  "
+            f"({success}/{total})"
+        )
+
         text = (
+            f"{headline}\n"
             f"📋 {funnel_display}\n"
-            f"{time_info}\n"
-            f"🆔 Template ID: {template_id[:8]}...\n"
-            f"📊 Всего отправлено: {total}\n"
+            f"🆔 {template_id[:8]}…\n"
             f"✅ Успешно: {success}\n"
             f"❌ Неудач: {failed}\n"
             f"📱 Уникальных номеров: {unique_phones}\n\n"
             f"📞 Детали доставки:\n" + "\n".join(phone_results)
         )
+
 
         # Если сообщение слишком длинное, обрезаем список номеров
         if len(text) > 4000:
