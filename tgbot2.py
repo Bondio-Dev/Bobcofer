@@ -238,7 +238,22 @@ MENU_BUTTONS = [
     ["Просмотр запланированных"],
     ["Просмотр админов"],
     ["Просмотреть отчёты"],
+    ["🏠 Главное меню"]  # ← ДОБАВИТЬ ЭТУ СТРОКУ
 ]
+
+def create_persistent_main_menu():
+    """Создает главное меню с постоянной клавиатурой"""
+    keyboard = [
+        [KeyboardButton(text=row[0])] for row in MENU_BUTTONS
+    ]
+    
+    return ReplyKeyboardMarkup(
+        keyboard=keyboard,
+        resize_keyboard=True,
+        is_persistent=True,  # ← КЛЮЧЕВОЙ ПАРАМЕТР - клавиатура всегда видна
+        one_time_keyboard=False,
+        input_field_placeholder="Выберите действие"
+    )
 
 # ---------------------------------------------------------------------------
 # States
@@ -668,15 +683,23 @@ router = Router()
 @router.message(CommandStart())
 @admin_required
 async def cmd_start(message: Message, state: FSMContext):
-    keyboard = [
-        [KeyboardButton(text=row[0])] for row in MENU_BUTTONS
-    ]
+    await state.clear()  # Очищаем состояние
+    
     await message.reply(
         "🏠 Главное меню:",
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard=keyboard,
-            resize_keyboard=True
-        ),
+        reply_markup=create_persistent_main_menu()  # ← ИСПОЛЬЗУЕМ НОВУЮ ФУНКЦИЮ
+    )
+    await state.set_state(Form.STATE_MENU)
+
+@router.message(F.text == "🏠 Главное меню")
+@admin_required
+async def handle_home_button(message: Message, state: FSMContext):
+    """Обрабатывает нажатие кнопки 'Главное меню' из любого состояния"""
+    await state.clear()
+    
+    await message.reply(
+        "🏠 Главное меню:",
+        reply_markup=create_persistent_main_menu()
     )
     await state.set_state(Form.STATE_MENU)
 
@@ -720,8 +743,16 @@ async def handle_menu(message: Message, state: FSMContext):
         )
         return
 
+    if text == "🏠 Главное меню":
+        await message.reply(
+            "🏠 Главное меню:",
+            reply_markup=create_persistent_main_menu()
+        )
+        return
+    
     # опционально: обрабатывать неизвестные команды
     await message.reply("❓ Команда не распознана, выберите опцию из меню.")
+
 
 # ---------------------------------------------------------------------------
 # 6. Хендлеры просмотра отчётов
