@@ -9,3 +9,13 @@ timestamp,phone,template_id,funnel,status,response_info
 2025-07-21 03:17:43,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,job_1b1d16cb,SUCCESS,"{   ""messageId"": ""aebd2f64-36eb-4252-9dfe-238218303172"",   ""status"": ""submitted"" }"
 2025-07-21 03:19:13,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,job_a0ca6b5f,SUCCESS,"{   ""messageId"": ""7a2e2987-fb70-4a40-9eb3-6219095ab45c"",   ""status"": ""submitted"" }"
 2025-07-21 03:23:47,+79111363436,263ad3ff-a524-4d0f-94f5-b6d1a369f915,job_86b6a47c,SUCCESS,"{   ""messageId"": ""42e32e86-6cca-4780-8493-c03eee682432"",   ""status"": ""submitted"" }"
+2025-07-22 02:40:48,+79111363436,0fa5b78b-5926-4fcb-97dc-62384152a730,job_fe90fcba,SUCCESS,"{   ""messageId"": ""93931b7b-5d15-4146-8bcf-c7970109ef61"",   ""status"": ""submitted"" }"
+2025-07-22 02:40:49,+79842739577,0fa5b78b-5926-4fcb-97dc-62384152a730,job_fe90fcba,SUCCESS,"{   ""messageId"": ""33681758-5bb6-4669-aa05-8373adeb5e20"",   ""status"": ""submitted"" }"
+2025-07-22 03:26:37,+79111363436,0fa5b78b-5926-4fcb-97dc-62384152a730,job_6501c05e,FAILED,Portal User Not Found With APIKey
+2025-07-22 03:26:39,+79842739577,0fa5b78b-5926-4fcb-97dc-62384152a730,job_6501c05e,FAILED,Portal User Not Found With APIKey
+2025-07-22 03:28:35,+79111363436,0fa5b78b-5926-4fcb-97dc-62384152a730,job_25eb4d55,SUCCESS,"{   ""messageId"": ""a43b5744-4089-4981-ada7-e495caeb3634"",   ""status"": ""submitted"" }"
+2025-07-22 03:28:37,+79842739577,0fa5b78b-5926-4fcb-97dc-62384152a730,job_25eb4d55,SUCCESS,"{   ""messageId"": ""c42e3596-41a5-4f00-a579-f625f161f6eb"",   ""status"": ""submitted"" }"
+2025-07-22 04:04:07,+79111363436,0fa5b78b-5926-4fcb-97dc-62384152a730,job_6c72bcbf,SUCCESS,"{   ""messageId"": ""87eebb81-31ac-42ad-b4bc-852dc7d6b059"",   ""status"": ""submitted"" }"
+2025-07-22 04:04:08,+79842739577,0fa5b78b-5926-4fcb-97dc-62384152a730,job_6c72bcbf,SUCCESS,"{   ""messageId"": ""feaadf8b-51e7-493f-afaf-01fa499f273a"",   ""status"": ""submitted"" }"
+2025-07-22 04:11:01,+79111363436,0fa5b78b-5926-4fcb-97dc-62384152a730,job_5b46c1fd,SUCCESS,"{   ""messageId"": ""47ea96db-5441-4827-a732-14b5fcb1e218"",   ""status"": ""submitted"" }"
+2025-07-22 04:11:02,+79842739577,0fa5b78b-5926-4fcb-97dc-62384152a730,job_5b46c1fd,SUCCESS,"{   ""messageId"": ""13b18e66-2963-4a1f-83c8-6a5f551497cd"",   ""status"": ""submitted"" }"

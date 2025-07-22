@@ -577,7 +577,7 @@ job_queue = SimpleJobQueue()
 
 
 # ---------------------------------------------------------------------------
-# ИЗМЕНЕННАЯ ФУНКЦИЯ: используем прямой вызов вместо subprocess
+# 2) Функция отправки рассылки: подстановка имени в первый параметр
 async def job_send_distribution(context):
     try:
         job = context.data
@@ -586,44 +586,50 @@ async def job_send_distribution(context):
             logger.error("Контактный файл %s не найден", contacts_path)
             return
 
-        phones = json.loads(contacts_path.read_text("utf-8"))
-        data = json.loads(MAIN_DATA.read_text("utf-8"))
-        params = [data["1"], data["2"]]
+        contacts_data = json.loads(contacts_path.read_text("utf-8"))
+        template_data = json.loads(MAIN_DATA.read_text("utf-8"))
 
-        # ЗАМЕНА: вместо send_via_bot_py используем прямой вызов send_template_async
-        for phone in phones:
+        # Совместимость со старым форматом
+        if contacts_data and isinstance(contacts_data[0], str):
+            contacts_data = [
+                {"phone": phone, "name": "Клиент"} for phone in contacts_data
+            ]
+
+        for contact in contacts_data:
+            params = [
+                contact["name"],               # [1] – имя клиента
+                template_data.get("2", ""),    # [2] – вторая переменная шаблона
+            ]
+
             code, resp = await send_template_async(
-                dest=phone,
+                dest=contact["phone"],
                 template_id=job["template_id"],
                 params=params,
                 lang=job["template_lang"],
-                funnel=job["job_id"]  # передаем job_id как funnel
+                funnel=job["job_id"],
             )
-            
-            # Логирование для JSON формата (как было в send_via_bot_py)
+
+            # Логирование JSON-формата
             log_extra = {
                 "template": job["template_id"],
                 "funnel": job["job_id"],
-                "phone": phone,
+                "phone": contact["phone"],
                 "success": code == 202,
                 "err": resp if code != 202 else "",
             }
-            
             level = logging.INFO if code == 202 else logging.ERROR
-            logger.log(level,
-                      "%s → %s", phone,
-                      "OK" if code == 202 else f"ERR {code}",
-                      extra=log_extra)
-            
-            await asyncio.sleep(0.5)  # асинхронная пауза
+            logger.log(level, "%s → %s", contact["phone"],
+                       "OK" if code == 202 else f"ERR {code}", extra=log_extra)
+
+            await asyncio.sleep(0.5)
 
         scheduled_store.remove(lambda x: x["job_id"] == job["job_id"])
-        logger.info(
-            "Рассылка %s завершена (%d номеров)", job["job_id"], len(phones)
-        )
+        logger.info("Рассылка %s завершена (%d номеров)",
+                    job["job_id"], len(contacts_data))
 
     except Exception:
         logger.exception("Ошибка в job_send_distribution")
+
 
 def schedule_job(run_at: datetime,
                 contacts_file: Path,
@@ -745,7 +751,7 @@ async def show_reports(message: Message, state: FSMContext):
             min_time = group['timestamp'].min()
 
             # ❶ Формируем метку только с датой и годом «ДД.MM.YYYY»
-            date_label = min_time.strftime('%d.%m.%Y')
+            date_label = min_time.strftime('%d.%m.%Y %H:%M')
 
             # Счётчики
             total_count = len(group)
@@ -1117,44 +1123,54 @@ def write_error_with_phone_check(lead_id, lead_name, phone, contact_name):
 
 
 
+# 1) Обработчик выбора аудитории: сохраняем список словарей {"phone", "name"}
 @router.callback_query(F.data.startswith(("aud:",)))
 @admin_required
 async def cb_audience(query: CallbackQuery, state: FSMContext):
     await query.answer()
-    
+
+    # 2) Удаляем старые JSON-файлы контактов перед загрузкой,
+    #    чтобы не копились лишние файлы (не трогаем только funnels.json)
+    for f in AMOCRM_DIR.glob("*.json"):
+        if f.name != "funnels.json":
+            try:
+                f.unlink()
+            except Exception as e:
+                logger.warning("Не удалось удалить старый файл %s: %s", f, e)
+
+    # Случай "Все воронки"
     if query.data == "aud:all":
-        contacts = []
+        contacts: list[dict] = []
         for file in AMOCRM_DIR.glob("*.json"):
-            if file.name == "funnels.json": # Пропускаем служебный файл
+            if file.name == "funnels.json":
                 continue
             try:
                 data = json.loads(file.read_text(encoding="utf-8"))
-                contacts.extend(data)
+                if data and isinstance(data[0], str):
+                    # старый формат — список телефонов
+                    contacts.extend([{"phone": p, "name": "Клиент"} for p in data])
+                else:
+                    # новый формат — список словарей
+                    contacts.extend(data)
             except Exception:
                 continue
 
-        tmp = (
-            MAIN_DATA.parent
-            / f"all_contacts_{uuid.uuid4().hex[:8]}.json"
-        )
-        tmp.write_text(
-            json.dumps(contacts, ensure_ascii=False), encoding="utf-8"
-        )
+        tmp = MAIN_DATA.parent / f"all_contacts_{uuid.uuid4().hex[:8]}.json"
+        tmp.write_text(json.dumps(contacts, ensure_ascii=False), encoding="utf-8")
         await state.update_data(contacts=str(tmp))
 
         await query.message.edit_text(
             f"⚠️ Вы выбрали рассылку по всем статусам ({len(contacts)} шт.). Вы уверены?",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(text="✅ Да", callback_data="aud_all:yes"),
-                        InlineKeyboardButton(text="⬅️ Отмена", callback_data="aud_all:no"),
-                    ]
-                ],
+                    [InlineKeyboardButton(text="✅ Да", callback_data="aud_all:yes")],
+                    [InlineKeyboardButton(text="⬅️ Отмена", callback_data="aud_all:no")],
+                ]
             ),
         )
         return
 
+    # Случай конкретной воронки
     if query.data.startswith("aud:f"):
         data_state = await state.get_data()
         funnel_map: dict = data_state.get("funnel_map", {})
@@ -1164,19 +1180,13 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             await query.message.answer("❌ Не удалось определить файл статуса.")
             return
 
-        # Получаем информацию о статусе из funnels.json
         snap_path = AMOCRM_DIR / "funnels.json"
         if not snap_path.exists():
             await query.message.answer("❌ Файл funnels.json не найден.")
             return
-
         snap = json.loads(snap_path.read_text("utf-8"))
-        status_info = None
-        for funnel in snap["funnels"]:
-            if funnel["file"] == file_name:
-                status_info = funnel
-                break
 
+        status_info = next((f for f in snap["funnels"] if f["file"] == file_name), None)
         if not status_info:
             await query.message.answer("❌ Информация о статусе не найдена.")
             return
@@ -1187,66 +1197,61 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
         status_id = status_info["status_id"]
 
         if not local.exists():
-            await query.message.answer("⏳ Скачиваю контакты…")
+            await query.message.edit_text("⏳ Скачиваю контакты…")
             try:
                 leads = mgr.get_leads(pipeline_id, status_id)
                 if not leads:
                     await query.message.answer(f"❌ В статусе '{status_name}' сделок нет.")
                     return
 
-                cids = [
-                    c["id"] for l in leads for c in l["_embedded"]["contacts"]
-                ]
+                cids = [c["id"] for l in leads for c in l["_embedded"]["contacts"]]
                 contacts_raw = mgr.get_contacts_bulk(cids)
-                phones: list[str] = []
 
+                contacts_data: list[dict] = []
                 for lead in leads:
                     for c in lead["_embedded"]["contacts"]:
                         co = contacts_raw.get(c["id"], {})
-                        phone = mgr.extract_phone(
-                            co.get("custom_fields_values", [])
-                        )
-                        if phone:
-                            contact_name = co.get("name", "")
-                        normalized = mgr.normalize_phone(phone)
+                        phone_raw = mgr.extract_phone(co.get("custom_fields_values", []))
+                        name = co.get("name", "") or "Клиент"
+                        normalized = mgr.normalize_phone(phone_raw)
                         if normalized:
-                            phones.append(normalized)
-                            
+                            contacts_data.append({"phone": normalized, "name": name})
                         else:
-                            write_error_with_phone_check(lead['id'], lead['name'], phone, contact_name)
+                            write_error_with_phone_check(
+                                lead["id"], lead["name"], phone_raw, name
+                            )
 
-                phones = list(dict.fromkeys(phones))
-                
-                local.write_text(
-                    json.dumps(phones, ensure_ascii=False), "utf-8"
-                )
+                # Убираем дубликаты по номеру
+                seen = set()
+                unique_contacts: list[dict] = []
+                for ct in contacts_data:
+                    if ct["phone"] not in seen:
+                        seen.add(ct["phone"])
+                        unique_contacts.append(ct)
 
+                local.write_text(json.dumps(unique_contacts, ensure_ascii=False), "utf-8")
             except Exception as e:
                 await query.message.answer(f"❌ Ошибка при загрузке контактов: {e}")
                 return
 
         contacts = json.loads(local.read_text("utf-8"))
-        tmp = (
-            MAIN_DATA.parent
-            / f"{Path(file_name).stem}_{uuid.uuid4().hex[:8]}.json"
-        )
+        tmp = MAIN_DATA.parent / f"{Path(file_name).stem}_{uuid.uuid4().hex[:8]}.json"
         tmp.write_text(json.dumps(contacts, ensure_ascii=False), "utf-8")
         await state.update_data(contacts=str(tmp))
 
         await query.message.edit_text(
             f"✅ Статус: {status_name}\n"
             f"📊 Загружено {len(contacts)} контактов.\n"
-            f"⚠️ Продолжить?",
+            "⚠️ Продолжить?",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [
-                        InlineKeyboardButton(text="✅ Да", callback_data="aud_f_yes"),
-                        InlineKeyboardButton(text="⬅️ Отмена", callback_data="aud_f_no"),
-                    ]
-                ],
+                    [InlineKeyboardButton(text="✅ Да", callback_data="aud_f_yes")],
+                    [InlineKeyboardButton(text="⬅️ Отмена", callback_data="aud_f_no")],
+                ]
             ),
         )
         return
+
 
 # ---------------------------------------------------------------------------
 # выбор шаблона после аудитории
@@ -1331,6 +1336,8 @@ async def cb_tpl_preview(query: CallbackQuery, state: FSMContext):
     )
     await state.set_state(Form.STATE_TEMPLATE_CONFIRM)
 
+# 1) В cb_tpl_confirm: сразу переходим к вводу поля "2"
+
 @router.callback_query(F.data.in_(["tpl_ok", "tpl_cancel"]))
 @admin_required
 async def cb_tpl_confirm(query: CallbackQuery, state: FSMContext):
@@ -1342,29 +1349,33 @@ async def cb_tpl_confirm(query: CallbackQuery, state: FSMContext):
         return
 
     data = await state.get_data()
-    tpl_id = data.get("tpl_selected")
-    tpl = data.get("templates_list", {}).get(tpl_id)
+    tpl = data.get("templates_list", {}).get(data.get("tpl_selected"))
     if not tpl:
         await query.message.reply("❌ Шаблон не найден.")
         await state.set_state(Form.STATE_MENU)
         return
 
-    body = tpl.get("templateContent") or tpl.get("body") or tpl.get("content", "")
     raw_meta = tpl.get("meta") or "{}"
     try:
         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else raw_meta
     except json.JSONDecodeError:
         meta = {}
-
     example = meta.get("example", "")
-    await state.update_data(new={"1": body, "2": example})
-    await state.update_data(chosen_tpl_id = tpl.get("id") or tpl.get("templateId"),
-                           chosen_tpl_lang = tpl.get("language") or tpl.get("lang") or "ru")
 
-    await query.message.edit_text(
-        f"✏️ Введите текст для поля {{1}} (по умолчанию «{body}»):"
+    # Сохраняем выбранный шаблон в state, чтобы потом не было KeyError
+    await state.update_data(
+        chosen_tpl_id   = tpl.get("id") or tpl.get("templateId"),
+        chosen_tpl_lang = tpl.get("language") or tpl.get("lang") or "ru",
+        new_field2      = example
     )
-    await state.set_state(Form.STATE_TEMPLATE_NEW_1)
+
+    # Пропускаем ввод поля 1 и сразу спрашиваем поле 2
+    await query.message.edit_text(
+        f"✏️ Введите текст для поля {{2}} (по умолчанию «{example}»):"
+    )
+    await state.set_state(Form.STATE_TEMPLATE_NEW_2)
+
+
 
 @router.message(Form.STATE_TEMPLATE_NEW_1)
 @admin_required
@@ -1382,39 +1393,34 @@ async def new_tpl_field1(message: Message, state: FSMContext):
     )
     await state.set_state(Form.STATE_TEMPLATE_NEW_2)
 
+# 3) Обработка ввода поля 2 (существующая функция new_tpl_field2), без изменений:
+
 @router.message(Form.STATE_TEMPLATE_NEW_2)
 @admin_required
 async def new_tpl_field2(message: Message, state: FSMContext):
     text = message.text.strip()
+    # Используем новое состояние new_field2
     data = await state.get_data()
-    new_data = data.get("new", {"1": "", "2": ""})
+    field2 = data.get("new_field2", "")
     if text:
-        new_data["2"] = text
-
+        field2 = text
+    # Сохраняем единственное поле
     MAIN_DATA.write_text(
-        json.dumps(new_data, indent=2, ensure_ascii=False), encoding="utf-8"
+        json.dumps({"2": field2}, ensure_ascii=False, indent=2),
+        encoding="utf-8"
     )
-
-    await message.reply(
-        f"✅ Поля установлены:\n"
-        f"{{1}} = «{new_data['1']}»\n"
-        f"{{2}} = «{new_data['2']}»"
-    )
-
+    await message.reply(f"✅ Поле {{2}} установлено: «{field2}»")
+    # Дальше — выбор времени и подтверждение рассылки
     buttons = [
-        [
-            InlineKeyboardButton(text="⚡ Сразу отправить", callback_data="time:now"),
-            InlineKeyboardButton(
-                text="⏰ Указать дату/время", callback_data="time:input"
-            ),
-        ]
+        [InlineKeyboardButton(text="⚡ Сразу отправить", callback_data="time:now")],
+        [InlineKeyboardButton(text="⏰ Указать дату/время", callback_data="time:input")],
     ]
-
     await message.reply(
         "⏰ Когда отправить рассылку?",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
     await state.set_state(Form.STATE_TIME_CHOOSE)
+
 
 # ---------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("time:"))
@@ -1513,17 +1519,18 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
     await state.set_state(Form.STATE_MENU)
 
 # ---------------------------------------------------------------------------
+# 3) Подтверждение рассылки по всем воронкам после выбора "Да"
 @router.callback_query(F.data.startswith("aud_all:"))
 @admin_required
 async def cb_aud_all_confirm(query: CallbackQuery, state: FSMContext):
     await query.answer()
-
     if query.data == "aud_all:no":
         await query.message.edit_text("❌ Действие отменено.")
         await state.set_state(Form.STATE_MENU)
         return
-
+    # Переходим к выбору шаблона с уже записанным state["contacts"]
     await send_templates_list(query, state)
+
 
 # ---------------------------------------------------------------------------
 @router.callback_query(F.data.startswith("job_detail:"))
