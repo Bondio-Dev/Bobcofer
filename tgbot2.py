@@ -471,9 +471,9 @@ def admin_required(func):
         )
         if user_id not in admins_store.read():
             if isinstance(message_or_query, CallbackQuery):
-                await message_or_query.message.reply_text(f"❌ Доступ запрещён. Ваш ID: {user_id}")
+                await message_or_query.message.reply_text(f"❌ Доступ запрещён. Ваш ID: <code>{user_id}</code>")
             else:
-                await message_or_query.reply(f"❌ Доступ запрещён. Ваш ID: {user_id}")
+                await message_or_query.reply(f"❌ Доступ запрещён. Ваш ID: <code>{user_id}</code>")
             return
         return await func(message_or_query, state)
     return wrapper
