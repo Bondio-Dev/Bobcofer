@@ -2,7 +2,7 @@ FROM python:3.11-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV DISPLAY=:99
-ENV PATH="/usr/local/binPATH}"
+ENV PATH="/usr/local/bin:/usr/bin:/bin:${PATH}"
 
 WORKDIR /app
 
