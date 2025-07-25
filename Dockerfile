@@ -1,39 +1,40 @@
 FROM python:3.11-bullseye
 
+ENV DEBIAN_FRONTEND=noninteractive
+ENV DISPLAY=:99
+
 WORKDIR /app
 
-# Обновляем пакеты и устанавливаем базовые зависимости
+# 1) Системные зависимости, Xvfb, fluxbox, x11vnc, библиотеки для Chrome, шрифты и пр.
+# 2) Добавляем репозиторий Google Chrome и сразу его устанавливаем
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    gcc libsqlite3-dev wget curl gnupg \
-    && rm -rf /var/lib/apt/lists/*
+      curl wget gnupg gcc libsqlite3-dev \
+      xvfb x11vnc fluxbox \
+      fonts-liberation libxss1 libcanberra-gtk3-0 \
+      libgl1-mesa-dri libgl1-mesa-glx libpango1.0-0 \
+      libpulse0 libv4l-0 fonts-symbola \
+  && curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+  && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
+         > /etc/apt/sources.list.d/google-chrome.list \
+  && apt-get update && apt-get install --no-install-recommends -y \
+      google-chrome-stable \
+  && rm -rf /var/lib/apt/lists/*
 
-# Добавляем репозиторий Google Chrome и устанавливаем его отдельно
-RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update && apt-get install --no-install-recommends -y \
-    google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
+# Копируем весь проект в /app
+COPY . /app
 
-# Устанавливаем X11 и VNC пакеты (убраны libindicator7 и libappindicator1)
-RUN apt-get update && apt-get install --no-install-recommends -y \
-    xvfb x11vnc fluxbox \
-    fonts-liberation libxss1 \
-    libcanberra-gtk3-0 libgl1-mesa-dri libgl1-mesa-glx libpango1.0-0 \
-    libpulse0 libv4l-0 fonts-symbola \
-    && rm -rf /var/lib/apt/lists/*
-
-# Копируем файлы проекта
-COPY . .
-
-# Устанавливаем Python зависимости
+# Устанавливаем Python-библиотеки
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Настраиваем VNC
-RUN mkdir -p /root/.vnc && \
-    echo "12345" | x11vnc -storepasswd -stdin /root/.vnc/passwd
+# Генерируем VNC-пароль (замените 12345 на свой)
+RUN mkdir -p /root/.vnc \
+ && x11vnc -storepasswd 12345 /root/.vnc/passwd
 
-# Настраиваем точку входа
-CMD Xvfb :99 -screen 0 1920x1080x24 & \
+# Точка входа: запускаем Xvfb, fluxbox, x11vnc и ваш бот
+CMD rm -f /tmp/.X*-lock /tmp/.X11-unix/X* && \
+    Xvfb :99 -screen 0 1920x1080x24 -ac +extension GLX +extension RANDR +extension RENDER & \
+    sleep 2 && \
     fluxbox & \
-    x11vnc -display :99 -forever -rfbauth /root/.vnc/passwd -bg -rfbport 5900 & \
-    export DISPLAY=:99 && python tgbot.py
+    sleep 1 && \
+    x11vnc -display :99 -forever -rfbauth /root/.vnc/passwd -bg -rfbport 5900 -listen 0.0.0.0 && \
+    python /app/tgbot.py
