@@ -1,22 +1,32 @@
-# Use official slim Python image for smaller footprint
+# Используем официальный slim Python образ для компактности
 FROM python:3.11-slim
 
-# Set working directory
+# Рабочая директория
 WORKDIR /app
 
-# Install system dependencies (if any)
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y gcc libsqlite3-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Установка необходимых системных пакетов, включая зависимости для Chrome, Xvfb и x11vnc
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    gcc libsqlite3-dev \
+    wget xvfb x11vnc \
+    libappindicator1 fonts-liberation libxss1 libindicator7 \
+    libcanberra-gtk3-0 libgl1-mesa-dri libgl1-mesa-glx libpango1.0-0 \
+    libpulse0 libv4l-0 fonts-symbola \
+    --fix-missing && \
+    # Установка Google Chrome
+    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    dpkg -i google-chrome-stable_current_amd64.deb || apt-get install -fy && \
+    rm -f google-chrome-stable_current_amd64.deb && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy application files
+# Копирование файлов приложения внутрь контейнера
 COPY . .
 
-# Install Python dependencies
+# Установка Python-зависимостей
 RUN pip install --no-cache-dir -r requarements.txt
 
-# Expose port if your bot serves a webhook or web endpoint (optional)
-# EXPOSE 8443
+# (При необходимости) открываем порт VNC или иные сервисные порты
+# EXPOSE 5900 # для VNC
+# EXPOSE 8443 # если нужен webhook
 
-# Default command to run the Telegram bot
-CMD ["python", "tgbot.py"]
+# Пример запуска: сначала Xvfb (виртуальный дисплей), затем ваш скрипт
+CMD ["sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 & export DISPLAY=:99 && python tgbot.py"]
