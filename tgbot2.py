@@ -61,6 +61,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
+import pywhatkit
 
 # ---------------------------------------------------------------------------
 # Настройки
@@ -70,11 +71,8 @@ CONTACTS_FILE = BASE_DIR / "contacts.json"
 MAIN_DATA = BASE_DIR / "data.json"
 
 # API настройки (из bot.py)
-API_KEY = "da7uofezaeuxx7pd6yyfnutvsojdjiuk"
-SOURCE_NUMBER = "79811090022"
-APP_NAME = "BOBCOFFER"
-API_URL = "https://api.gupshup.io/sm/api/v1/template/msg"
-APP_ID = "8e8e001c-cc0c-4502-b8f5-1682a9628c99"
+TEMPLATES_FILE = BASE_DIR / "templates.json"
+PYWHATKIT_WAIT_TIME = 10
 
 AMOCRM_DIR = BASE_DIR / "amocrm_contacts"
 AMOCRM_DIR.mkdir(exist_ok=True)
@@ -120,51 +118,34 @@ def log_message(
 
 # ---------------------------------------------------------------------------
 # Функция отправки из bot.py (синхронная версия)
-def send_template_sync(dest: str,
-                      template_id: str,
-                      params: list[str],
-                      lang: str = "ru",
-                      funnel: str = "") -> tuple[int, str]:
-    logging.debug("send_template → dest=%s, tpl_id=%s, params=%s, lang=%s",
-                 dest, template_id, params, lang)
-    
-    payload = {
-        "source": SOURCE_NUMBER,
-        "destination": dest,
-        "template": json.dumps({
-            "id": template_id,
-            "params": params,
-            "languageCode": lang,
-        }),
-        "src.name": APP_NAME,
-    }
-    
-    headers = {
-        "apikey": API_KEY,
-        "Content-Type": "application/x-www-form-urlencoded",
-    }
-    
+def send_message_sync(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
+    """Отправка сообщения через PyWhatKit"""
     try:
-        r = requests.post(API_URL, data=payload, headers=headers, timeout=10)
-        success = r.status_code == 202
-        log_message(dest, success, r.text, template_id, funnel) # передаём funnel
-        logging.debug("Gupshup HTTP %s → %s", r.status_code, r.text[:400])
-        return r.status_code, r.text
+        # Форматируем номер телефона
+        if not dest.startswith('+'):
+            dest = '+' + dest
+            
+        # Отправляем сообщение
+        pywhatkit.sendwhatmsg_instantly(
+            phone_no=dest,
+            message=message,
+            wait_time=PYWHATKIT_WAIT_TIME,
+            tab_close=True
+        )
+        
+        log_message(dest, True, "Отправлено", "pywhatkit", funnel)
+        return 202, "Сообщение отправлено"
+        
     except Exception as e:
-        error_msg = f"Error: {e}"
-        log_message(dest, False, error_msg, template_id, funnel)
-        logging.exception("⛔ Request failed")
+        error_msg = f"Ошибка PyWhatKit: {e}"
+        log_message(dest, False, error_msg, "pywhatkit", funnel)
         return 0, error_msg
 
 # ---------------------------------------------------------------------------
 # Асинхронная обертка для отправки
-async def send_template_async(dest: str,
-                             template_id: str,
-                             params: list[str],
-                             lang: str = "ru",
-                             funnel: str = "") -> tuple[int, str]:
-    """Асинхронная обертка для send_template_sync"""
-    return await asyncio.to_thread(send_template_sync, dest, template_id, params, lang, funnel)
+async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
+    """Асинхронная обертка для send_message_sync"""
+    return await asyncio.to_thread(send_message_sync, dest, message, funnel)
 
 # ---------------------------------------------------------------------------
 # 5. Утилита чтения логов (bot.log + delivery_logs.txt)
@@ -408,14 +389,7 @@ class AmoCRMCategoryManager:
 # ---------------------------------------------------------------------------
 from main import build_funnels_snapshot
 
-# глобальная сессия ─ создаём один раз
-session: aiohttp.ClientSession | None = None
 
-async def get_session() -> aiohttp.ClientSession:
-    global session
-    if session is None or session.closed:
-        session = aiohttp.ClientSession()
-    return session
 
 # ---------------------------------------------------------------------------
 # Обновляем список воронок: чистим папку и пишем funnels.json
@@ -496,12 +470,34 @@ def admin_required(func):
 def ensure_dirs():
     BASE_DIR.mkdir(exist_ok=True)
     AMOCRM_DIR.mkdir(exist_ok=True)
+    
     if not TOKEN_FILE.exists():
         TOKEN_FILE.write_text('{"BOT_TOKEN": "YOUR_TOKEN_HERE"}', encoding="utf-8")
+    
     if not CONTACTS_FILE.exists():
         CONTACTS_FILE.write_text("[]", encoding="utf-8")
+    
     if not MAIN_DATA.exists():
         MAIN_DATA.write_text('{"1": "", "2": ""}', encoding="utf-8")
+    
+    # Создаем файл шаблонов если его нет
+    if not TEMPLATES_FILE.exists():
+        default_templates = [
+            {
+                "id": "greeting",
+                "name": "Приветствие", 
+                "content": "Привет, {name}! {message}"
+            },
+            {
+                "id": "reminder",
+                "name": "Напоминание",
+                "content": "Уважаемый {name}, напоминаем: {message}"
+            }
+        ]
+        TEMPLATES_FILE.write_text(
+            json.dumps(default_templates, ensure_ascii=False, indent=2),
+            encoding="utf-8"
+        )
 
 def local_offset() -> timedelta:
     return datetime.now() - datetime.now(timezone.utc).replace(tzinfo=None)
@@ -603,6 +599,14 @@ async def job_send_distribution(context):
 
         contacts_data = json.loads(contacts_path.read_text("utf-8"))
         template_data = json.loads(MAIN_DATA.read_text("utf-8"))
+        
+        # Получаем шаблон
+        templates = json.loads(TEMPLATES_FILE.read_text("utf-8"))
+        template = next((t for t in templates if t["id"] == job["template_id"]), None)
+        
+        if not template:
+            logger.error("Шаблон %s не найден", job["template_id"])
+            return
 
         # Совместимость со старым форматом
         if contacts_data and isinstance(contacts_data[0], str):
@@ -611,20 +615,19 @@ async def job_send_distribution(context):
             ]
 
         for contact in contacts_data:
-            params = [
-                contact["name"],               # [1] – имя клиента
-                template_data.get("2", ""),    # [2] – вторая переменная шаблона
-            ]
-
-            code, resp = await send_template_async(
+            # Форматируем сообщение
+            message = template["content"].format(
+                name=contact["name"],
+                message=template_data.get("2", "")
+            )
+            
+            code, resp = await send_message_async(
                 dest=contact["phone"],
-                template_id=job["template_id"],
-                params=params,
-                lang=job["template_lang"],
+                message=message,
                 funnel=job["job_id"],
             )
 
-            # Логирование JSON-формата
+            # Логирование
             log_extra = {
                 "template": job["template_id"],
                 "funnel": job["job_id"],
@@ -636,7 +639,8 @@ async def job_send_distribution(context):
             logger.log(level, "%s → %s", contact["phone"],
                        "OK" if code == 202 else f"ERR {code}", extra=log_extra)
 
-            await asyncio.sleep(0.5)
+            # Пауза между отправками
+            await asyncio.sleep(30)  # Увеличиваем паузу для PyWhatKit
 
         scheduled_store.remove(lambda x: x["job_id"] == job["job_id"])
         logger.info("Рассылка %s завершена (%d номеров)",
@@ -649,32 +653,30 @@ async def job_send_distribution(context):
 def schedule_job(run_at: datetime,
                 contacts_file: Path,
                 template_id: str,
-                template_lang: str) -> str:
-    """
-    Сохраняет задачу в scheduled.json и регистрирует её в SimpleJobQueue.
-    Возвращает сгенерированный job_id.
-    """
+                template_lang: str = "ru") -> str:
+    """Сохраняет задачу в scheduled.json и регистрирует её в SimpleJobQueue"""
     job_id = f"job_{uuid.uuid4().hex[:8]}"
+    
     data = {
         "job_id": job_id,
         "run_at": run_at.isoformat(),
         "contacts": str(contacts_file),
         "template_id": template_id,
-        "template_lang": template_lang # ← новый ключ
+        "template_lang": template_lang  # Сохраняем для совместимости
     }
-    
-    #--- логируем для отладки
+
     logger.debug(
         "schedule_job → id=%s, run_at=%s, contacts=%s, tpl=%s",
         job_id, run_at, contacts_file, template_id
     )
-    
+
     scheduled_store.append(data)
+
     # регистрируем задачу в очереди
     asyncio.create_task(
         job_queue.run_once(job_send_distribution, run_at, data, job_id)
     )
-    
+
     return job_id
 
 router = Router()
@@ -1008,60 +1010,49 @@ async def ask_audience(
 
 # ---------------------------------------------------------------------------
 async def fetch_templates(prefix: str = "view_tpl"):
-    """
-    Возвращает:
-    templates – оригинальный список шаблонов из Gupshup
-    tpl_map – {id_на_кнопке: объект_шаблона}
-    buttons – список рядов InlineKeyboardButton
-    """
-    sess = await get_session()
-    url = f"https://api.gupshup.io/wa/app/{APP_ID}/template"
-    headers = {
-        "accept": "application/json",
-        "apikey": API_KEY,
-    }
-
-    async with sess.get(url, headers=headers) as resp:
-        if resp.status != 200:
-            raise RuntimeError(
-                f"Gupshup HTTP {resp.status}: {await resp.text()}"
+    """Загружает шаблоны из локального JSON файла"""
+    try:
+        if not TEMPLATES_FILE.exists():
+            # Создаем файл с примером шаблонов
+            default_templates = [
+                {
+                    "id": "greeting", 
+                    "name": "Базовый",
+                    "content": "Здравствуйте, {name}! {message}"
+                }
+            ]
+            TEMPLATES_FILE.write_text(
+                json.dumps(default_templates, ensure_ascii=False, indent=2),
+                encoding="utf-8"
             )
-
-        data = await resp.json()
-        # --- НОВОЕ: поддерживаем обе схемы ответа ---
-        templates: list[dict] = data.get("templates") or data.get("data") or []
-        # --------------------------------------------
-
-        if not templates:
-            logger.warning("Gupshup вернул пустой список шаблонов")
-            return [], {}, []
-
+        
+        templates = json.loads(TEMPLATES_FILE.read_text(encoding="utf-8"))
+        
         tpl_map: dict[str, dict] = {}
         buttons: list[list[InlineKeyboardButton]] = []
-
+        
         for idx, tpl in enumerate(templates):
             tid = f"t{idx}"
             tpl_map[tid] = tpl
-
-            title = (
-                tpl.get("name")
-                or tpl.get("templateName")
-                or tpl.get("elementName") # встречается в новых ответах
-                or f"Шаблон {idx+1}"
-            )
-
-            buttons.append(
-                [InlineKeyboardButton(
-                    text=title, # именованный аргумент
+            
+            buttons.append([
+                InlineKeyboardButton(
+                    text=tpl["name"],
                     callback_data=f"{prefix}:{tid}"
-                )]
-            )
+                )
+            ])
+        logger.info("Загружено шаблонов: %d", len(templates))
 
         return templates, tpl_map, buttons
+        
+    except Exception as e:
+        logger.exception("Ошибка при загрузке шаблонов")
+        return [], {}, []
 
 # ---------------------------------------------------------------------------
 # список шаблонов из «Главного меню»
 async def view_templates(message: Message, state: FSMContext):
+    
     try:
         _, tpl_map, buttons = await fetch_templates(prefix="view_tpl")
     except Exception:
@@ -1097,14 +1088,14 @@ async def cb_view_tpl(query: CallbackQuery, state: FSMContext):
         await query.message.reply("❌ Шаблон не найден.")
         return
 
-    body = tpl.get("templateContent") or tpl.get("body") or tpl.get("content", "")
+    body = tpl.get("content", "")
     raw_meta = tpl.get("meta") or "{}"
     try:
         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else raw_meta
     except json.JSONDecodeError:
         meta = {}
 
-    example = meta.get("example", "")
+    example = "Пример: " + body.replace("{name}", "Иван").replace("{message}", "тестовое сообщение")
     preview = (
         f"📋 Шаблон:\n{body}\n\n📝 Пример:\n{example}"
         if example
@@ -1334,7 +1325,7 @@ async def cb_tpl_preview(query: CallbackQuery, state: FSMContext):
         await state.set_state(Form.STATE_MENU)
         return
 
-    body = tpl.get("templateContent") or tpl.get("body") or tpl.get("content", "")
+    body = tpl.get("content", "")
     raw_meta = tpl.get("meta") or "{}"
     try:
         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else raw_meta

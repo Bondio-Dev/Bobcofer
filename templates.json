@@ -1,0 +1,7 @@
+[
+  {
+    "id": "greeting",
+    "name": "Обычный",
+    "content": "Здравствуйте, {name}! {message}"
+  }
+]

@@ -19,3 +19,5 @@ timestamp,phone,template_id,funnel,status,response_info
 2025-07-22 04:04:08,+79842739577,0fa5b78b-5926-4fcb-97dc-62384152a730,job_6c72bcbf,SUCCESS,"{   ""messageId"": ""feaadf8b-51e7-493f-afaf-01fa499f273a"",   ""status"": ""submitted"" }"
 2025-07-22 04:11:01,+79111363436,0fa5b78b-5926-4fcb-97dc-62384152a730,job_5b46c1fd,SUCCESS,"{   ""messageId"": ""47ea96db-5441-4827-a732-14b5fcb1e218"",   ""status"": ""submitted"" }"
 2025-07-22 04:11:02,+79842739577,0fa5b78b-5926-4fcb-97dc-62384152a730,job_5b46c1fd,SUCCESS,"{   ""messageId"": ""13b18e66-2963-4a1f-83c8-6a5f551497cd"",   ""status"": ""submitted"" }"
+2025-07-25 14:35:30,+79111363436,pywhatkit,job_5f8627ca,SUCCESS,Отправлено
+2025-07-25 14:36:13,+79842739577,pywhatkit,job_5f8627ca,SUCCESS,Отправлено
