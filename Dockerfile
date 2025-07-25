@@ -1,4 +1,3 @@
-# Dockerfile
 FROM python:3.11-bullseye
 
 ENV DEBIAN_FRONTEND=noninteractive
