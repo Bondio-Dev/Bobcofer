@@ -2,13 +2,12 @@ services:
   bobcofer-bot:
     build: .
     container_name: bobcofer-bot
-    restart: unless-stopped
+    # Временно отключаем автоперезапуск для отладки
+    restart: "no"
     env_file:
       - .env
-    # Пробрасываем порт VNC на локальный хост (5900)
     ports:
-      - "5900:5900"  # VNC для браузера
-    # Объёмы (volumes) для хранения данных, логов, конфигов и т.д.
+      - "5900:5900"
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
@@ -16,6 +15,12 @@ services:
       - ./contacts.json:/app/contacts.json
       - ./conf.json:/app/conf.json
       - ./token.json:/app/token.json
-    # Для отображения графики — установите DISPLAY
     environment:
       - DISPLAY=:99
+    # Добавляем health check
+    healthcheck:
+      test: ["CMD", "netstat", "-tuln", "|", "grep", ":5900"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
