@@ -2,23 +2,37 @@ FROM python:3.11-bullseye
 
 WORKDIR /app
 
+# Обновляем пакеты и устанавливаем базовые зависимости
 RUN apt-get update && apt-get install --no-install-recommends -y \
-    gcc libsqlite3-dev wget \
+    gcc libsqlite3-dev wget curl gnupg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Добавляем репозиторий Google Chrome и устанавливаем его отдельно
+RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - \
+    && echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update && apt-get install --no-install-recommends -y \
+    google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем X11 и VNC пакеты
+RUN apt-get update && apt-get install --no-install-recommends -y \
     xvfb x11vnc fluxbox \
     libappindicator1 fonts-liberation libxss1 libindicator7 \
     libcanberra-gtk3-0 libgl1-mesa-dri libgl1-mesa-glx libpango1.0-0 \
     libpulse0 libv4l-0 fonts-symbola \
-    && wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && dpkg -i google-chrome-stable_current_amd64.deb || apt-get install -fy \
-    && rm -f google-chrome-stable_current_amd64.deb \
     && rm -rf /var/lib/apt/lists/*
 
+# Копируем файлы проекта
 COPY . .
 
-RUN pip install --no-cache-dir -r requarements.txt
+# Устанавливаем Python зависимости (исправлена опечатка)
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN mkdir -p /root/.vnc && x11vnc -storepasswd 12345 /root/.vnc/passwd
+# Настраиваем VNC
+RUN mkdir -p /root/.vnc && \
+    echo "12345" | x11vnc -storepasswd -stdin /root/.vnc/passwd
 
+# Настраиваем точку входа
 CMD Xvfb :99 -screen 0 1920x1080x24 & \
     fluxbox & \
     x11vnc -display :99 -forever -rfbauth /root/.vnc/passwd -bg -rfbport 5900 & \
