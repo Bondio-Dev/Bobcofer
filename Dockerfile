@@ -1,11 +1,12 @@
-FROM python:3.11-slim
+# Используем полный образ Debian (а не slim) — в нем есть все основные репозитории
+FROM python:3.11-bullseye
 
 WORKDIR /app
 
-# Устанавливаем системные зависимости, Chrome, Xvfb и x11vnc
+# Дополняем system-пакетами для Chrome, Xvfb, x11vnc, fluxbox и зависимостям
 RUN apt-get update && apt-get install --no-install-recommends -y \
     gcc libsqlite3-dev wget \
-    xvfb x11vnc fluxbox \
+    xvfb x11vnc \
     libappindicator1 fonts-liberation libxss1 libindicator7 \
     libcanberra-gtk3-0 libgl1-mesa-dri libgl1-mesa-glx libpango1.0-0 \
     libpulse0 libv4l-0 fonts-symbola \
@@ -14,15 +15,18 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     && rm -f google-chrome-stable_current_amd64.deb \
     && rm -rf /var/lib/apt/lists/*
 
+# Копируем приложение
 COPY . .
 
+# Устанавливаем Python-зависимости
 RUN pip install --no-cache-dir -r requarements.txt
 
-# Создаём VNC пароль (замените '12345' на свой безопасный)
-RUN mkdir /root/.vnc \
+# Создаем VNC-пароль (пароль '12345' — замените на свой!)
+# (Здесь x11vnc гарантированно установлен)
+RUN mkdir -p /root/.vnc \
     && x11vnc -storepasswd 12345 /root/.vnc/passwd
 
-# По умолчанию запускаем всё нужное в фоне и ваш бот
+# Запуск виртуального X-сервера, fluxbox, VNC и бота
 CMD Xvfb :99 -screen 0 1920x1080x24 & \
     fluxbox & \
     x11vnc -display :99 -forever -nopw -rfbauth /root/.vnc/passwd -bg -rfbport 5900 & \
