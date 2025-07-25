@@ -4,7 +4,7 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     gcc libsqlite3-dev wget \
-    xvfb fluxbox x11vnc \  # Убедитесь, что x11vnc явно указан здесь
+    xvfb x11vnc fluxbox \
     libappindicator1 fonts-liberation libxss1 libindicator7 \
     libcanberra-gtk3-0 libgl1-mesa-dri libgl1-mesa-glx libpango1.0-0 \
     libpulse0 libv4l-0 fonts-symbola \
@@ -15,8 +15,7 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 COPY . .
 
-# Исправьте опечатку в названии файла требований (если нужно)
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requarements.txt
 
 RUN mkdir -p /root/.vnc && x11vnc -storepasswd 12345 /root/.vnc/passwd
 
