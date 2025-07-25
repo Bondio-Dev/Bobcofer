@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   bobcofer-bot:
     build: .
@@ -5,16 +7,17 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    # Пробрасываем порт VNC на локальный хост (5900)
+    ports:
+      - "5900:5900"  # VNC для браузера
+    # Объёмы (volumes) для хранения данных, логов, конфигов и т.д.
     volumes:
-      # Persist bot data directory
       - ./data:/app/data
-      # Persist logs
       - ./logs:/app/logs
-      # Persist scheduled tasks file
       - ./scheduled.json:/app/scheduled.json
-      # Persist contacts
       - ./contacts.json:/app/contacts.json
-      # Persist configuration (if you edit conf.json in host)
       - ./conf.json:/app/conf.json
-      # Persist token file (if used)
       - ./token.json:/app/token.json
+    # Для отображения графики — установите DISPLAY
+    environment:
+      - DISPLAY=:99
