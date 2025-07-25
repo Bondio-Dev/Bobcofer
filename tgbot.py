@@ -72,9 +72,13 @@ MAIN_DATA = BASE_DIR / "data.json"
 
 # API настройки (из bot.py)
 TEMPLATES_FILE = BASE_DIR / "templates.json"
-PYWHATKIT_WAIT_TIME = 10
+
+import random
+def get_random_wait_time():
+    return random.randint(10, 45)
 
 AMOCRM_DIR = BASE_DIR / "amocrm_contacts"
+TEMP_CONTACTS_DIR = BASE_DIR / "temp_contacts"  # ← НОВАЯ СТРОКА
 AMOCRM_DIR.mkdir(exist_ok=True)
 
 # ---------------------------------------------------------------------------
@@ -129,7 +133,7 @@ def send_message_sync(dest: str, message: str, funnel: str = "") -> tuple[int, s
         pywhatkit.sendwhatmsg_instantly(
             phone_no=dest,
             message=message,
-            wait_time=PYWHATKIT_WAIT_TIME,
+            wait_time=get_random_wait_time(),
             tab_close=True
         )
         
@@ -470,6 +474,7 @@ def admin_required(func):
 def ensure_dirs():
     BASE_DIR.mkdir(exist_ok=True)
     AMOCRM_DIR.mkdir(exist_ok=True)
+    TEMP_CONTACTS_DIR.mkdir(exist_ok=True)  # ← НОВАЯ СТРОКА
     
     if not TOKEN_FILE.exists():
         TOKEN_FILE.write_text('{"BOT_TOKEN": "YOUR_TOKEN_HERE"}', encoding="utf-8")
@@ -586,7 +591,7 @@ job_queue = SimpleJobQueue()
 
 #-----------------
 
-
+import random
 # ---------------------------------------------------------------------------
 # 2) Функция отправки рассылки: подстановка имени в первый параметр
 async def job_send_distribution(context):
@@ -640,7 +645,10 @@ async def job_send_distribution(context):
                        "OK" if code == 202 else f"ERR {code}", extra=log_extra)
 
             # Пауза между отправками
-            await asyncio.sleep(30)  # Увеличиваем паузу для PyWhatKit
+            
+            pause_seconds = random.randint(30, 300)
+            await asyncio.sleep(pause_seconds)
+            logger.info(f"Пауза между отправками: {pause_seconds} секунд")
 
         scheduled_store.remove(lambda x: x["job_id"] == job["job_id"])
         logger.info("Рассылка %s завершена (%d номеров)",
@@ -1177,7 +1185,8 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             except Exception:
                 continue
 
-        tmp = MAIN_DATA.parent / f"all_contacts_{uuid.uuid4().hex[:8]}.json"
+        tmp = TEMP_CONTACTS_DIR / f"all_contacts_{uuid.uuid4().hex[:8]}.json"
+
         tmp.write_text(json.dumps(contacts, ensure_ascii=False), encoding="utf-8")
         await state.update_data(contacts=str(tmp))
 
@@ -1257,7 +1266,8 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
                 return
 
         contacts = json.loads(local.read_text("utf-8"))
-        tmp = MAIN_DATA.parent / f"{Path(file_name).stem}_{uuid.uuid4().hex[:8]}.json"
+        tmp = TEMP_CONTACTS_DIR / f"{Path(file_name).stem}_{uuid.uuid4().hex[:8]}.json"
+
         tmp.write_text(json.dumps(contacts, ensure_ascii=False), "utf-8")
         await state.update_data(contacts=str(tmp))
 
