@@ -242,22 +242,27 @@ def create_persistent_main_menu():
 
 # ---------------------------------------------------------------------------
 # States
+from aiogram.fsm.state import State, StatesGroup
+
 class Form(StatesGroup):
-    STATE_MENU = State()
-    STATE_TEMPLATE_CHOOSE = State()
+    STATE_MENU             = State()
+    STATE_TEMPLATE_CHOOSE  = State()
     STATE_TEMPLATE_CONFIRM = State()
-    STATE_TEMPLATE_NEW_1 = State()
-    STATE_TEMPLATE_NEW_2 = State()
-    STATE_TEMPLATE_VIEW = State()
-    STATE_AUDIENCE = State()
-    STATE_TIME_CHOOSE = State()
-    STATE_TIME_INPUT = State()
-    STATE_CONFIRM = State()
-    STATE_ADMIN_ADD = State()
-    STATE_AMOCRM_INPUT = State()
-    STATE_AMOCRM_FILENAME = State()
-    STATE_REPORT_LIST = State()
-    STATE_REPORT_DETAIL = State()
+    STATE_TEMPLATE_NEW_1   = State()
+    STATE_TEMPLATE_NEW_2   = State()
+    STATE_TEMPLATE_VIEW    = State()
+    STATE_AUDIENCE         = State()
+    STATE_TIME_CHOOSE      = State()
+    STATE_TIME_INPUT       = State()
+    STATE_TIME_RANGE       = State()   # ← добавлено
+    STATE_CONFIRM          = State()
+    STATE_ADMIN_ADD        = State()
+    STATE_AMOCRM_INPUT     = State()
+    STATE_AMOCRM_FILENAME  = State()
+    STATE_REPORT_LIST      = State()
+    STATE_REPORT_DETAIL    = State()
+
+
 
 # ---------------------------------------------------------------------------
 # AmoCRM manager
@@ -594,6 +599,7 @@ job_queue = SimpleJobQueue()
 import random
 # ---------------------------------------------------------------------------
 # 2) Функция отправки рассылки: подстановка имени в первый параметр
+# 2) Полная функция отправки рассылки с учётом временного диапазона
 async def job_send_distribution(context):
     try:
         job = context.data
@@ -603,88 +609,77 @@ async def job_send_distribution(context):
             return
 
         contacts_data = json.loads(contacts_path.read_text("utf-8"))
-        template_data = json.loads(MAIN_DATA.read_text("utf-8"))
-        
-        # Получаем шаблон
         templates = json.loads(TEMPLATES_FILE.read_text("utf-8"))
         template = next((t for t in templates if t["id"] == job["template_id"]), None)
-        
         if not template:
             logger.error("Шаблон %s не найден", job["template_id"])
             return
 
-        # Совместимость со старым форматом
-        if contacts_data and isinstance(contacts_data[0], str):
-            contacts_data = [
-                {"phone": phone, "name": "Клиент"} for phone in contacts_data
-            ]
+        # Временной диапазон
+        day_from = datetime.strptime(job.get("day_from", "00:00"), "%H:%M").time()
+        day_until = datetime.strptime(job.get("day_until", "23:59"), "%H:%M").time()
 
         for contact in contacts_data:
-            # Форматируем сообщение
+            # Ждём начала допустимого диапазона
+            while True:
+                now_local = (now_tz() + local_offset()).time()
+                if day_from <= now_local <= day_until:
+                    break
+                await asyncio.sleep(60)
+
+            # Формируем и отправляем
             message = template["content"].format(
                 name=contact["name"],
-                message=template_data.get("2", "")
+                message=json.loads(MAIN_DATA.read_text())["2"]
             )
-            
             code, resp = await send_message_async(
                 dest=contact["phone"],
                 message=message,
-                funnel=job["job_id"],
+                funnel=job["job_id"]
             )
-
-            # Логирование
             log_extra = {
                 "template": job["template_id"],
                 "funnel": job["job_id"],
                 "phone": contact["phone"],
                 "success": code == 202,
-                "err": resp if code != 202 else "",
+                "err": "" if code == 202 else resp
             }
             level = logging.INFO if code == 202 else logging.ERROR
-            logger.log(level, "%s → %s", contact["phone"],
-                       "OK" if code == 202 else f"ERR {code}", extra=log_extra)
+            logger.log(level, "%s → %s", contact["phone"], "OK" if code == 202 else f"ERR {code}", extra=log_extra)
 
-            # Пауза между отправками
-            
             pause_seconds = random.randint(30, 300)
-            await asyncio.sleep(pause_seconds)
             logger.info(f"Пауза между отправками: {pause_seconds} секунд")
+            await asyncio.sleep(pause_seconds)
 
         scheduled_store.remove(lambda x: x["job_id"] == job["job_id"])
-        logger.info("Рассылка %s завершена (%d номеров)",
-                    job["job_id"], len(contacts_data))
+        logger.info("Рассылка %s завершена (%d номеров)", job["job_id"], len(contacts_data))
 
     except Exception:
         logger.exception("Ошибка в job_send_distribution")
 
 
+
+# 2.7) Расширение функции schedule_job для сохранения диапазона
 def schedule_job(run_at: datetime,
-                contacts_file: Path,
-                template_id: str,
-                template_lang: str = "ru") -> str:
-    """Сохраняет задачу в scheduled.json и регистрирует её в SimpleJobQueue"""
+                 contacts_file: Path,
+                 template_id: str,
+                 template_lang: str = "ru",
+                 day_from: str = "00:00",
+                 day_until: str = "23:59") -> str:
     job_id = f"job_{uuid.uuid4().hex[:8]}"
-    
     data = {
         "job_id": job_id,
         "run_at": run_at.isoformat(),
         "contacts": str(contacts_file),
         "template_id": template_id,
-        "template_lang": template_lang  # Сохраняем для совместимости
+        "template_lang": template_lang,
+        "day_from": day_from,
+        "day_until": day_until,
     }
-
-    logger.debug(
-        "schedule_job → id=%s, run_at=%s, contacts=%s, tpl=%s",
-        job_id, run_at, contacts_file, template_id
-    )
-
     scheduled_store.append(data)
-
-    # регистрируем задачу в очереди
     asyncio.create_task(
         job_queue.run_once(job_send_distribution, run_at, data, job_id)
     )
-
     return job_id
 
 router = Router()
@@ -1154,13 +1149,12 @@ def write_error_with_phone_check(lead_id, lead_name, phone, contact_name):
 
 
 # 1) Обработчик выбора аудитории: сохраняем список словарей {"phone", "name"}
-@router.callback_query(F.data.startswith(("aud:",)))
+@router.callback_query(F.data.startswith("aud:"))
 @admin_required
 async def cb_audience(query: CallbackQuery, state: FSMContext):
     await query.answer()
 
-    # 2) Удаляем старые JSON-файлы контактов перед загрузкой,
-    #    чтобы не копились лишние файлы (не трогаем только funnels.json)
+    # Удаляем все JSON, кроме funnels.json
     for f in AMOCRM_DIR.glob("*.json"):
         if f.name != "funnels.json":
             try:
@@ -1168,30 +1162,35 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             except Exception as e:
                 logger.warning("Не удалось удалить старый файл %s: %s", f, e)
 
-    # Случай "Все воронки"
+    # Если "Все воронки"
     if query.data == "aud:all":
-        contacts: list[dict] = []
+        contacts = []
         for file in AMOCRM_DIR.glob("*.json"):
             if file.name == "funnels.json":
                 continue
             try:
                 data = json.loads(file.read_text(encoding="utf-8"))
                 if data and isinstance(data[0], str):
-                    # старый формат — список телефонов
                     contacts.extend([{"phone": p, "name": "Клиент"} for p in data])
                 else:
-                    # новый формат — список словарей
                     contacts.extend(data)
             except Exception:
                 continue
 
         tmp = TEMP_CONTACTS_DIR / f"all_contacts_{uuid.uuid4().hex[:8]}.json"
-
         tmp.write_text(json.dumps(contacts, ensure_ascii=False), encoding="utf-8")
         await state.update_data(contacts=str(tmp))
 
+        cnt = len(contacts)
+        min_secs = 40 * cnt
+        max_secs = 345 * cnt
+        min_hms = str(timedelta(seconds=min_secs))
+        max_hms = str(timedelta(seconds=max_secs))
+
         await query.message.edit_text(
-            f"⚠️ Вы выбрали рассылку по всем статусам ({len(contacts)} шт.). Вы уверены?",
+            f"📊 Всего контактов: {cnt}\n"
+            f"⏳ Оценка длительности рассылки: от {min_hms} до {max_hms}\n"
+            "⚠️ Продолжить?",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
                     [InlineKeyboardButton(text="✅ Да", callback_data="aud_all:yes")],
@@ -1201,10 +1200,10 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
         )
         return
 
-    # Случай конкретной воронки
+    # Если конкретная воронка
     if query.data.startswith("aud:f"):
         data_state = await state.get_data()
-        funnel_map: dict = data_state.get("funnel_map", {})
+        funnel_map = data_state.get("funnel_map", {})
         fid = query.data.split(":", 1)[1]
         file_name = funnel_map.get(fid)
         if not file_name:
@@ -1222,10 +1221,10 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             await query.message.answer("❌ Информация о статусе не найдена.")
             return
 
-        local = AMOCRM_DIR / file_name
         status_name = status_info["name"]
         pipeline_id = status_info["pipeline_id"]
         status_id = status_info["status_id"]
+        local = AMOCRM_DIR / file_name
 
         if not local.exists():
             await query.message.edit_text("⏳ Скачиваю контакты…")
@@ -1238,7 +1237,7 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
                 cids = [c["id"] for l in leads for c in l["_embedded"]["contacts"]]
                 contacts_raw = mgr.get_contacts_bulk(cids)
 
-                contacts_data: list[dict] = []
+                contacts_data = []
                 for lead in leads:
                     for c in lead["_embedded"]["contacts"]:
                         co = contacts_raw.get(c["id"], {})
@@ -1248,13 +1247,11 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
                         if normalized:
                             contacts_data.append({"phone": normalized, "name": name})
                         else:
-                            write_error_with_phone_check(
-                                lead["id"], lead["name"], phone_raw, name
-                            )
+                            write_error_with_phone_check(lead["id"], lead["name"], phone_raw, name)
 
-                # Убираем дубликаты по номеру
+                # Уникализация
                 seen = set()
-                unique_contacts: list[dict] = []
+                unique_contacts = []
                 for ct in contacts_data:
                     if ct["phone"] not in seen:
                         seen.add(ct["phone"])
@@ -1267,13 +1264,19 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
 
         contacts = json.loads(local.read_text("utf-8"))
         tmp = TEMP_CONTACTS_DIR / f"{Path(file_name).stem}_{uuid.uuid4().hex[:8]}.json"
-
         tmp.write_text(json.dumps(contacts, ensure_ascii=False), "utf-8")
         await state.update_data(contacts=str(tmp))
 
+        cnt = len(contacts)
+        min_secs = 40 * cnt
+        max_secs = 345 * cnt
+        min_hms = str(timedelta(seconds=min_secs))
+        max_hms = str(timedelta(seconds=max_secs))
+
         await query.message.edit_text(
             f"✅ Статус: {status_name}\n"
-            f"📊 Загружено {len(contacts)} контактов.\n"
+            f"📊 Контактов: {cnt}\n"
+            f"⏳ Оценка длительности рассылки(часы, минуты, секунды): от {min_hms} до {max_hms}\n"
             "⚠️ Продолжить?",
             reply_markup=InlineKeyboardMarkup(
                 inline_keyboard=[
@@ -1283,7 +1286,6 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             ),
         )
         return
-
 
 # ---------------------------------------------------------------------------
 # выбор шаблона после аудитории
@@ -1459,60 +1461,77 @@ async def new_tpl_field2(message: Message, state: FSMContext):
 @admin_required
 async def cb_time_choose(query: CallbackQuery, state: FSMContext):
     await query.answer()
-
     if query.data.endswith("now"):
-        min_time = now_tz()
-        await state.update_data(run_at=min_time.isoformat())
-        await confirm_distribution(query.message, state)
-        return
+        # Сразу – сохраняем run_at и дефолтный диапазон
+        await state.update_data(
+            run_at=now_tz().isoformat(),
+            day_from="00:00",
+            day_until="23:59"
+        )
+        return await confirm_distribution(query.message, state)
 
+    # Если выбрано указать дату/время
     await query.message.reply(
         "📅 Введите дату и время в формате DD.MM.YYYY HH:MM",
         reply_markup=ReplyKeyboardRemove(),
     )
     await state.set_state(Form.STATE_TIME_INPUT)
 
+
+
 @router.message(Form.STATE_TIME_INPUT)
 @admin_required
 async def time_input(message: Message, state: FSMContext):
     dt = parse_datetime(message.text)
-    min_time = now_tz()
-    if not dt:
-        await message.reply("❌ Некорректная дата/время, попробуйте снова.")
-        return
-
-    if dt < min_time:
-        await message.reply(
-            f"⚠️ Минимальное время отправки: {fmt_local(min_time)}"
-        )
-        return
-
+    if not dt or dt < now_tz():
+        return await message.reply("❌ Некорректная или прошедшая дата, попробуйте снова.")
     await state.update_data(run_at=dt.isoformat())
+    # Переходим к вводу диапазона
+    await ask_time_range(message, state)
+
+
+async def ask_time_range(where: Message, state: FSMContext):
+    await where.reply(
+        "🌓 Укажите с какого по какой период времени будет происходить рассылка формате HH:MM–HH:MM (пример 08:00–22:00):",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+    await state.set_state(Form.STATE_TIME_RANGE)
+
+@router.message(Form.STATE_TIME_RANGE)
+@admin_required
+async def handle_time_range(message: Message, state: FSMContext):
+    m = re.match(r"^(\d{2}:\d{2})\s*[–-]\s*(\d{2}:\d{2})$", message.text.strip())
+    if not m:
+        return await message.reply("❌ Формат HH:MM–HH:MM, попробуйте ещё раз.")
+    day_from, day_until = m.groups()
+    if datetime.strptime(day_from, '%H:%M') >= datetime.strptime(day_until, '%H:%M'):
+        return await message.reply("❌ Начало должно быть раньше конца.")
+    await state.update_data(day_from=day_from, day_until=day_until)
     await confirm_distribution(message, state)
+
+
 
 async def confirm_distribution(message: Message, state: FSMContext):
     preview = render_message_main()
     data = await state.get_data()
     run_at = datetime.fromisoformat(data["run_at"])
+    day_from  = data["day_from"]
+    day_until = data["day_until"]
 
-    when = (
-        "сейчас"
-        if run_at < now_tz() + timedelta(seconds=30)
-        else fmt_local(run_at)
-    )
-
-    buttons = [
-        [
-            InlineKeyboardButton(text="✅ Подтвердить", callback_data="confirm:yes"),
-            InlineKeyboardButton(text="❌ Отмена", callback_data="confirm:no"),
-        ]
-    ]
-
+    when = "сейчас" if run_at < now_tz() + timedelta(seconds=30) else fmt_local(run_at)
     await message.reply(
-        f"📄 Сообщение:\n\n{preview}\n\n⏰ Будет отправлено: {when}",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        f"📄 Сообщение:\n\n{preview}\n"
+        f"⏰ Старт: {when}\n"
+        f"🌗 Диапазон: {day_from} – {day_until}",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text='✅ Подтвердить', callback_data='confirm:yes')],
+                [InlineKeyboardButton(text='❌ Отмена',      callback_data='confirm:no')],
+            ]
+        ),
     )
     await state.set_state(Form.STATE_CONFIRM)
+
 
 @router.callback_query(F.data.startswith("confirm:"))
 @admin_required

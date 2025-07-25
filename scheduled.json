@@ -12,5 +12,14 @@
     "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_d0451042.json",
     "template_id": "greeting",
     "template_lang": "ru"
+  },
+  {
+    "job_id": "job_e0e85a23",
+    "run_at": "2025-07-25T23:29:00.000002+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_d3c25de9.json",
+    "template_id": "greeting",
+    "template_lang": "ru",
+    "day_from": "00:00",
+    "day_until": "23:59"
   }
 ]

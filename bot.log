@@ -798,3 +798,69 @@
 {"time": "2025-07-25 19:37:14+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Sleep for 5.023567 seconds and try again... (tryings = 52, bot id = 7745492431)"}
 {"time": "2025-07-25 19:37:20+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped"}
 {"time": "2025-07-25 19:37:20+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped for bot @Bobcoffer_tg_bot id=7745492431 - 'Bobcoffer'"}
+{"time": "2025-07-25 23:02:16+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "🚀 Бот запущен."}
+{"time": "2025-07-25 23:02:16+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Start polling"}
+{"time": "2025-07-25 23:02:16+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Run polling for bot @Bobcoffer_tg_bot id=7745492431 - 'Bobcoffer'"}
+{"time": "2025-07-25 23:02:16+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230992 is handled. Duration 179 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:16+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "✅ AmoCRM готов"}
+{"time": "2025-07-25 23:02:21+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230993 is handled. Duration 1135 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:25+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230994 is handled. Duration 1783 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:28+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Загружено шаблонов: 1"}
+{"time": "2025-07-25 23:02:29+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230995 is handled. Duration 222 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:30+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230996 is handled. Duration 122 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:31+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230997 is handled. Duration 244 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:33+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230998 is handled. Duration 265 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:35+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758230999 is not handled. Duration 51 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:02:35+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Cause exception while process update id=758230999 by bot id=7745492431\nKeyError: 'day_from'"}
+{"time": "2025-07-25 23:12:00+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped"}
+{"time": "2025-07-25 23:12:00+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped for bot @Bobcoffer_tg_bot id=7745492431 - 'Bobcoffer'"}
+{"time": "2025-07-25 23:12:08+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "🚀 Бот запущен."}
+{"time": "2025-07-25 23:12:08+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Start polling"}
+{"time": "2025-07-25 23:12:08+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Run polling for bot @Bobcoffer_tg_bot id=7745492431 - 'Bobcoffer'"}
+{"time": "2025-07-25 23:12:08+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231000 is handled. Duration 158 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:08+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "✅ AmoCRM готов"}
+{"time": "2025-07-25 23:12:10+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231001 is handled. Duration 1152 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:14+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231002 is handled. Duration 2391 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:26+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Загружено шаблонов: 1"}
+{"time": "2025-07-25 23:12:26+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231003 is handled. Duration 107 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:27+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231004 is handled. Duration 110 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:28+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231005 is handled. Duration 167 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:29+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231006 is handled. Duration 143 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:31+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231007 is handled. Duration 139 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:46+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231008 is handled. Duration 104 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:47+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231009 is handled. Duration 48 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:49+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231010 is handled. Duration 49 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:50+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231011 is handled. Duration 156 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:54+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231012 is handled. Duration 49 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:12:58+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231013 is handled. Duration 1882 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:13:01+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231014 is handled. Duration 2266 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:13:15+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Загружено шаблонов: 1"}
+{"time": "2025-07-25 23:13:15+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231015 is handled. Duration 101 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:13:16+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231016 is handled. Duration 107 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:13:18+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231017 is handled. Duration 102 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:13:20+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231018 is handled. Duration 128 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:13:21+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231019 is handled. Duration 89 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:14:40+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped"}
+{"time": "2025-07-25 23:14:40+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped for bot @Bobcoffer_tg_bot id=7745492431 - 'Bobcoffer'"}
+{"time": "2025-07-25 23:22:50+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "🚀 Бот запущен."}
+{"time": "2025-07-25 23:22:50+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Start polling"}
+{"time": "2025-07-25 23:22:50+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Run polling for bot @Bobcoffer_tg_bot id=7745492431 - 'Bobcoffer'"}
+{"time": "2025-07-25 23:22:50+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "✅ AmoCRM готов"}
+{"time": "2025-07-25 23:22:52+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231020 is handled. Duration 169 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:22:55+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231021 is handled. Duration 1149 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:22:58+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231022 is handled. Duration 2045 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:23:05+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Загружено шаблонов: 1"}
+{"time": "2025-07-25 23:23:05+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231023 is handled. Duration 122 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:23:06+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231024 is handled. Duration 105 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:23:09+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231025 is handled. Duration 107 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:23:11+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231026 is handled. Duration 140 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:23:13+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231027 is handled. Duration 114 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:23:30+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231028 is handled. Duration 65 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:24:38+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231029 is handled. Duration 63 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:24:42+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Update id=758231030 is handled. Duration 147 ms by bot id=7745492431"}
+{"time": "2025-07-25 23:29:26+00:00", "template": "greeting", "funnel": "job_e0e85a23", "phone": "+79111363436", "success": true, "error": "", "msg": "+79111363436 → OK"}
+{"time": "2025-07-25 23:29:26+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Пауза между отправками: 40 секунд"}
+{"time": "2025-07-25 23:30:38+00:00", "template": "greeting", "funnel": "job_e0e85a23", "phone": "+79842739577", "success": true, "error": "", "msg": "+79842739577 → OK"}
+{"time": "2025-07-25 23:30:38+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Пауза между отправками: 166 секунд"}
+{"time": "2025-07-25 23:33:04+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped"}
+{"time": "2025-07-25 23:33:04+00:00", "template": "", "funnel": "", "phone": "", "success": "", "error": "", "msg": "Polling stopped for bot @Bobcoffer_tg_bot id=7745492431 - 'Bobcoffer'"}
