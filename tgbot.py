@@ -532,9 +532,10 @@ def render_message_main() -> str:
     except Exception:
         return "Нет данных"
 
+# Замените функцию build_scheduled_rows (добавьте кнопку главного меню)
 def build_scheduled_rows():
     jobs = scheduled_store.read()
-    return [
+    rows = [
         [
             InlineKeyboardButton(
                 text=fmt_local(datetime.fromisoformat(j["run_at"])),
@@ -543,7 +544,13 @@ def build_scheduled_rows():
         ]
         for j in jobs
     ]
+    rows.append(
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="to_main_menu")]
+    )
+    return rows
 
+
+# Замените функцию build_admin_rows (добавьте кнопку главного меню)
 def build_admin_rows():
     admins = admins_store.read()
     rows = [
@@ -557,7 +564,11 @@ def build_admin_rows():
     rows.append(
         [InlineKeyboardButton(text="➕ Добавить", callback_data="adm_add")]
     )
+    rows.append(
+        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="to_main_menu")]
+    )
     return rows
+
 
 
 # ---------------------------------------------------------------------------
@@ -709,9 +720,17 @@ async def handle_home_button(message: Message, state: FSMContext):
     await state.set_state(Form.STATE_MENU)
 
 # ---------------------------------------------------------------------------
-@router.message(Form.STATE_MENU)
+# Заменить существующий обработчик handle_menu на этот:
+@router.message(lambda message: message.text in [button[0] for button in MENU_BUTTONS])
 @admin_required
 async def handle_menu(message: Message, state: FSMContext):
+    """Обработчик главного меню - работает независимо от состояния"""
+    
+    # Если состояние не установлено - устанавливаем
+    current_state = await state.get_state()
+    if current_state is None:
+        await state.set_state(Form.STATE_MENU)
+    
     text = message.text
     
     if text == "Выбрать воронку":
@@ -728,12 +747,12 @@ async def handle_menu(message: Message, state: FSMContext):
         await show_reports(message, state)
         return
 
-
     if text == "Просмотр запланированных":
         rows = build_scheduled_rows()
         if not rows:
             await message.reply("📭 Запланированных рассылок нет.")
             return
+
         await message.reply(
             "📅 Запланированные рассылки:",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
@@ -754,9 +773,10 @@ async def handle_menu(message: Message, state: FSMContext):
             reply_markup=create_persistent_main_menu()
         )
         return
-    
-    # опционально: обрабатывать неизвестные команды
+
+    # Если попали сюда - неизвестная команда
     await message.reply("❓ Команда не распознана, выберите опцию из меню.")
+
 
 
 # ---------------------------------------------------------------------------
@@ -765,37 +785,23 @@ import pandas as pd
 
 LOG_FILE = 'logs/delivery_logs.csv'
 
-# 1) Функция показа списка отчётов
-# 1) Функция показа списка отчётов
 async def show_reports(message: Message, state: FSMContext):
     """
     Показывает список всех отправок, сгруппированных по уникальному funnel ID.
-    Каждая кнопка представляет отдельную рассылку.
     """
     try:
-        # Читаем CSV в DataFrame
         df = pd.read_csv(LOG_FILE, parse_dates=['timestamp'])
         if df.empty:
             await message.reply("❌ Нет данных в логах.")
             return
 
-        # Группируем по funnel (уникальный ID отправки)
         funnel_stats = {}
-
         for funnel, group in df.groupby('funnel'):
-            # Берём минимальную метку времени для даты
             min_time = group['timestamp'].min()
-
-            # ❶ Формируем метку только с датой и годом «ДД.MM.YYYY»
             date_label = min_time.strftime('%d.%m.%Y %H:%M')
-
-            # Счётчики
             total_count = len(group)
             success_count = (group['status'] == 'SUCCESS').sum()
-
-            # Итоговая подпись: «Дата – успешно/всего»
             display_name = f"{date_label} – {success_count}/{total_count}"
-
             funnel_stats[funnel] = {
                 'display_name': display_name,
                 'min_time': min_time,
@@ -803,30 +809,27 @@ async def show_reports(message: Message, state: FSMContext):
                 'success': success_count,
             }
 
-        # Сортируем по времени (от новых к старым)
         sorted_funnels = sorted(
             funnel_stats.items(),
             key=lambda x: x[1]['min_time'],
             reverse=True
         )
 
-        # Формируем кнопки
         buttons = []
         for funnel, stats in sorted_funnels:
             text = stats['display_name']
             callback = f"funnel_rep:{funnel}"
             buttons.append([InlineKeyboardButton(text=text, callback_data=callback)])
 
-        # Кнопка «назад»
         buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="rep_back")])
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
         await message.reply("📊 Отчёты по рассылкам:", reply_markup=keyboard)
-        await state.set_state(Form.STATE_REPORT_LIST)
-
+        # УДАЛЕНА СТРОКА: await state.set_state(Form.STATE_REPORT_LIST)
     except Exception as e:
         logger.exception(f"Ошибка в show_reports: {e}")
         await message.reply("❌ Ошибка при загрузке отчётов.")
+
 
 
 
@@ -942,20 +945,6 @@ async def cb_back_to_reports(query: CallbackQuery, state: FSMContext):
     await show_reports(message_like, state)
 
 
-# 5. Убедитесь, что в роутерах есть эти обработчики:
-"""
-Добавить в роутеры (после существующих обработчиков отчетов):
-
-@router.callback_query(F.data.startswith("funnel_rep:"))
-@admin_required
-async def cb_funnel_report_detail(query: CallbackQuery, state: FSMContext):
-    # код функции выше
-
-@router.callback_query(F.data == "back_to_reports")
-@admin_required  
-async def cb_back_to_reports(query: CallbackQuery, state: FSMContext):
-    # код функции выше
-"""
 
 
 # 3) Колбэк "назад" из меню отчётов
@@ -1053,9 +1042,7 @@ async def fetch_templates(prefix: str = "view_tpl"):
         return [], {}, []
 
 # ---------------------------------------------------------------------------
-# список шаблонов из «Главного меню»
 async def view_templates(message: Message, state: FSMContext):
-    
     try:
         _, tpl_map, buttons = await fetch_templates(prefix="view_tpl")
     except Exception:
@@ -1064,14 +1051,14 @@ async def view_templates(message: Message, state: FSMContext):
         return
 
     buttons.append([InlineKeyboardButton(text="⬅️ В меню", callback_data="view_back")])
-
     await message.reply(
         "📋 Доступные шаблоны:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
+    await state.update_data(view_tpl_map=tpl_map)
+    # УДАЛЕНА СТРОКА: await state.set_state(Form.STATE_TEMPLATE_VIEW)
 
-    await state.update_data(view_tpl_map=tpl_map) # для cb_view_tpl
-    await state.set_state(Form.STATE_TEMPLATE_VIEW)
+
 
 @router.callback_query(F.data == "view_back")
 @admin_required
@@ -1080,6 +1067,7 @@ async def cb_view_back(query: CallbackQuery, state: FSMContext):
     await query.message.edit_text("🏠 Главное меню.")
     await state.set_state(Form.STATE_MENU)
 
+# Замените обработчик cb_view_tpl (удалите строку с set_state в конце)
 @router.callback_query(F.data.startswith("view_tpl:"))
 @admin_required
 async def cb_view_tpl(query: CallbackQuery, state: FSMContext):
@@ -1097,23 +1085,26 @@ async def cb_view_tpl(query: CallbackQuery, state: FSMContext):
         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else raw_meta
     except json.JSONDecodeError:
         meta = {}
-
+    
     example = "Пример: " + body.replace("{name}", "Иван").replace("{message}", "тестовое сообщение")
     preview = (
         f"📋 Шаблон:\n{body}\n\n📝 Пример:\n{example}"
         if example
         else f"📋 Шаблон:\n{body}"
     )
-
+    
     await query.message.edit_text(
         preview,
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="⬅️ Назад", callback_data="view_back")]
+                [InlineKeyboardButton(text="⬅️ Назад", callback_data="view_back")],
+                [InlineKeyboardButton(text="🏠 Главное меню", callback_data="to_main_menu")]
             ]
         ),
     )
-    await state.set_state(Form.STATE_TEMPLATE_VIEW)
+    # УДАЛЕНА СТРОКА: await state.set_state(Form.STATE_TEMPLATE_VIEW)
+
+
 
 # ---------------------------------------------------------------------------
 
@@ -1828,6 +1819,57 @@ async def cb_admin_to_menu(query: CallbackQuery, state: FSMContext):
     await query.answer()
     await query.message.edit_text("🏠 Главное меню.")
     await state.set_state(Form.STATE_MENU)
+
+# ---------------------------------------------------------------------------
+# ГЛОБАЛЬНЫЙ ОБРАБОТЧИК для любых состояний: ловит кнопки меню и сбрасывает в главное
+@router.message()
+@admin_required
+async def global_fallback(message: Message, state: FSMContext):
+    """
+    Обрабатывает сообщения в любом состоянии.
+    Если это кнопка меню — сбрасывает состояние и перенаправляет в handle_menu.
+    """
+    # Получаем текущее состояние
+    current_state = await state.get_state()
+    
+    # Проверяем, является ли текст кнопкой главного меню
+    menu_buttons = [button[0] for button in MENU_BUTTONS]  # Предполагаем, что MENU_BUTTONS определено
+    is_menu_button = message.text in menu_buttons
+    
+    # Если это кнопка меню (в любом состоянии)
+    if is_menu_button:
+        # Сбрасываем состояние на главное меню
+        await state.clear()  # Очищаем данные, чтобы не тащить старый flow
+        await state.set_state(Form.STATE_MENU)
+        
+        # Перенаправляем в основной обработчик меню
+        await handle_menu(message, state)
+        return
+    
+    # Если состояние не установлено (как в предыдущем решении)
+    if current_state is None:
+        await message.reply(
+            "🏠 Добро пожаловать! Выберите действие из меню:",
+            reply_markup=create_persistent_main_menu()
+        )
+        await state.set_state(Form.STATE_MENU)
+        return
+    
+    # Если сообщение не обработано (fallback для других случаев)
+    await message.reply(
+        "❓ Команда не распознана. Используйте кнопки меню или нажмите 🏠 Главное меню"
+    )
+
+@router.callback_query(F.data == "to_main_menu")
+@admin_required
+async def cb_to_main_menu(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+    await state.clear()
+    await state.set_state(Form.STATE_MENU)
+    await query.message.edit_text(
+        "🏠 Главное меню:",
+        reply_markup=create_persistent_main_menu()
+    )
 
 # ---------------------------------------------------------------------------
 async def main():
