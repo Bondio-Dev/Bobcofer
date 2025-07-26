@@ -1537,37 +1537,60 @@ async def confirm_distribution(message: Message, state: FSMContext):
 @admin_required
 async def cb_confirm(query: CallbackQuery, state: FSMContext):
     await query.answer()
+    # correctly get_data()
     data = await state.get_data()
 
+    # Проверяем, что аудитория выбрана
     if "contacts" not in data:
         await query.message.reply("❌ Сначала выберите аудиторию.")
         await state.set_state(Form.STATE_AUDIENCE)
         return
 
+    # Отмена
     if query.data.endswith("no"):
         await query.message.edit_text("❌ Действие отменено.")
         await state.set_state(Form.STATE_MENU)
         return
 
-    template_id = data["chosen_tpl_id"]
+    # Получаем все необходимые поля из state
+    run_at_iso    = data.get("run_at")
+    day_from      = data.get("day_from", "00:00")
+    day_until     = data.get("day_until", "23:59")
+    contacts_file = Path(data["contacts"])
+    template_id   = data.get("chosen_tpl_id")
     template_lang = data.get("chosen_tpl_lang", "ru")
 
-    job_id = schedule_job(datetime.fromisoformat(data["run_at"]),
-                         Path(data["contacts"]),
-                         template_id,
-                         template_lang)
+    if not run_at_iso or not template_id:
+        await query.message.reply("❌ Не удалось получить время или шаблон. Повторите заново.")
+        await state.set_state(Form.STATE_MENU)
+        return
 
-    run_at = datetime.fromisoformat(data["run_at"])
+    run_at = datetime.fromisoformat(run_at_iso)
+
+    # Планируем задачу с учётом диапазона
+    job_id = schedule_job(
+        run_at,
+        contacts_file,
+        template_id,
+        template_lang,
+        day_from=day_from,
+        day_until=day_until
+    )
+
+    # Форматируем время для пользователя
     when = (
         "сразу"
         if run_at < now_tz() + timedelta(seconds=30)
         else fmt_local(run_at)
     )
 
+    # Отправляем финальное сообщение
     await query.message.edit_text(
         f"✅ Рассылка запланирована ({job_id}), время: {when}."
     )
     await state.set_state(Form.STATE_MENU)
+
+
 
 # ---------------------------------------------------------------------------
 # 3) Подтверждение рассылки по всем воронкам после выбора "Да"

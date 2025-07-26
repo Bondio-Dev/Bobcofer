@@ -21,5 +21,14 @@
     "template_lang": "ru",
     "day_from": "00:00",
     "day_until": "23:59"
+  },
+  {
+    "job_id": "job_e4e17054",
+    "run_at": "2025-07-27T00:30:00.000002+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_9ecf8956.json",
+    "template_id": "greeting",
+    "template_lang": "ru",
+    "day_from": "00:00",
+    "day_until": "23:59"
   }
 ]
