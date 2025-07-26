@@ -6,7 +6,7 @@ set -e
 DISPLAY_NUM="${1#:}"
 export DISPLAY=":${DISPLAY_NUM}"
 
-# Fluxbox
+# Минимальная конфигурация Fluxbox
 FLUX_DIR="/root/.fluxbox"
 mkdir -p "${FLUX_DIR}"
 cat > "${FLUX_DIR}/init" <<EOF
@@ -17,16 +17,16 @@ EOF
 touch "${FLUX_DIR}/keys" "${FLUX_DIR}/menu" "${FLUX_DIR}/apps"
 chmod 644 "${FLUX_DIR}/"{init,keys,menu,apps}
 
-# Генерация настоящей cookie
+# Генерация MIT-MAGIC-COOKIE-1
 Xvfb "${DISPLAY}" -screen 0 1x1x16 -ac &
 XVFB_PID=$!
 sleep 1
 xauth generate "${DISPLAY}" . trusted >/dev/null
 kill $XVFB_PID || true
 
-# Убеждаемся, что ~/.Xauthority существует
-XAUTH=/root/.Xauthority
-touch "${XAUTH}"
-chmod 600 "${XAUTH}"
+# Убедимся, что ~/.Xauthority существует
+XAUTH_FILE="/root/.Xauthority"
+touch "${XAUTH_FILE}"
+chmod 600 "${XAUTH_FILE}"
 
 echo "[setup] X11 и Fluxbox настроены"
