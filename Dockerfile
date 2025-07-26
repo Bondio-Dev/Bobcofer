@@ -16,7 +16,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl wget gnupg gcc libsqlite3-dev \
         xvfb x11vnc fluxbox \
-        x11-utils xauth proc-liberation libxss1 libcanberra-gtk3-0 \
+        x11-utils xauth procps net-tools \
+        fonts-liberation libxss1 libcanberra-gtk3-0 \
         libgl1-mesa-dri libgl1-mesa-glx libpango1.0-0 \
         libpulse0 libv4l-0 fonts-symbola && \
     curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
