@@ -1,6 +1,6 @@
 # Makefile для управления проектом с интерактивным меню 🚀
 .DEFAULT_GOAL := help
-.PHONY: help down up build rebuild logs clean push test install reset
+.PHONY: help down up build rebuild logs clean push reset install
 
 # Цвета для оформления
 GREEN = \033[0;32m
@@ -18,8 +18,7 @@ help:
 	@printf "${GREEN}5.${NC} 📜  Просмотр логов\n"
 	@printf "${GREEN}6.${NC} 🧹  Полная очистка (контейнеры, volumes, образы, кэш builder)\n"
 	@printf "${GREEN}7.${NC} 📌  Git: Добавить, закоммитить и запушить изменения\n"
-	@printf "${GREEN}8.${NC} 🧪  Запустить тесты API\n"
-	@printf "${GREEN}9.${NC} 🔄  Сбросить локальные изменения (git reset)\n"
+	@printf "${GREEN}8.${NC} 🔄  Сбросить локальные изменения (git reset)\n"
 	@printf "${GREEN}0.${NC} ❌  Выход\n\n"
 	@printf "${BLUE}Выберите действие (введите цифру):${NC} " && read choice; \
 	case "$$choice" in \
@@ -30,8 +29,7 @@ help:
 		5) make logs;; \
 		6) make clean;; \
 		7) make push;; \
-		8) make test;; \
-		9) make reset;; \
+		8) make reset;; \
 		0) printf "\n👋 До свидания!\n";; \
 		*) printf "\n❌ Неверный выбор, попробуйте снова\n"; make help;; \
 	esac
