@@ -9,7 +9,8 @@ services:
     environment:
       - DISPLAY=:0
       - BROWSER=google-chrome
-      # Для myuser файл .Xauthority будет работать автоматически
+      - XAUTHORITY=/root/.Xauthority
+      
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /home/myuser/.Xauthority:/root/.Xauthority:ro
