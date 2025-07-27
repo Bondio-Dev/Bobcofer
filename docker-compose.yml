@@ -1,19 +1,42 @@
 services:
+  # Init-контейнер для настройки X11 авторизации
+  xauth-setup:
+    image: alpine:latest
+    container_name: xauth-setup
+    volumes:
+      - /tmp:/host-tmp:rw
+      - /var/run/lightdm:/var/run/lightdm:ro
+    command: >
+      sh -c "
+        rm -f /host-tmp/.docker.xauth &&
+        touch /host-tmp/.docker.xauth &&
+        chmod 644 /host-tmp/.docker.xauth &&
+        if [ -f '/var/run/lightdm/root/:0' ]; then
+          cp '/var/run/lightdm/root/:0' /host-tmp/.docker.xauth &&
+          echo '✅ X11 авторизация скопирована из LightDM';
+        else
+          echo '⚠️ Создан пустой файл авторизации';
+        fi
+      "
+
+  # Основной контейнер с браузером
   bobcofer-bot:
     build: .
     container_name: bobcofer-bot
     network_mode: "host"
     restart: unless-stopped
+    depends_on:
+      xauth-setup:
+        condition: service_completed_successfully
     env_file:
       - .env
     environment:
-      - DISPLAY=:0
-      - BROWSER=google-chrome
-      - XAUTHORITY=/root/.Xauthority
-      
+       - DISPLAY=:0
+       - XAUTHORITY=/tmp/.docker.xauth
+       - BROWSER=/usr/bin/google-chrome
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /home/myuser/.Xauthority:/root/.Xauthority:ro
+      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json

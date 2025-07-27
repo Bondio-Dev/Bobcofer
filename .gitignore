@@ -1,5 +1,9 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
+amocrm_contacts/
+logs/
+temp_contacts/
+PyWhatKit_DB.txt
 *.py[codz]
 *$py.class
 
