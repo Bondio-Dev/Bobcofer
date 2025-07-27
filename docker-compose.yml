@@ -1,4 +1,34 @@
 services:
+  # Init-контейнер для создания правильной авторизации
+  xauth-setup:
+    image: alpine:latest
+    container_name: xauth-setup
+    volumes:
+      - /var/run/lightdm:/var/run/lightdm:ro
+      - /tmp:/host-tmp:rw
+    command: |
+      sh -c "
+        echo '=== Создание X11 авторизации ==='
+        
+        # Удаляем старый файл
+        rm -f /host-tmp/.docker.xauth
+        
+        # Пытаемся скопировать от LightDM
+        if [ -f '/var/run/lightdm/root/:0' ]; then
+          cp '/var/run/lightdm/root/:0' /host-tmp/.docker.xauth
+          chmod 644 /host-tmp/.docker.xauth
+          echo '✅ Cookie скопирован от LightDM'
+        else
+          # Создаем пустой файл как fallback
+          touch /host-tmp/.docker.xauth
+          chmod 644 /host-tmp/.docker.xauth
+          echo '⚠️ Создан пустой файл авторизации'
+        fi
+        
+        echo '✅ Авторизация готова'
+      "
+
+  # Основной контейнер
   bobcofer-bot:
     build: .
     container_name: bobcofer-bot
@@ -11,16 +41,14 @@ services:
       - BROWSER=google-chrome
       - XAUTHORITY=/tmp/.docker.xauth
     volumes:
-      # X11 сокет
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      
-      # Файл авторизации (НОВЫЙ PATH!)
       - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
-      
-      # Данные бота
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json
       - ./contacts.json:/app/contacts.json
       - ./conf.json:/app/conf.json
       - ./token.json:/app/token.json
+    depends_on:
+      xauth-setup:
+        condition: service_completed_successfully
