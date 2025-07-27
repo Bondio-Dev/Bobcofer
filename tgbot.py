@@ -131,7 +131,7 @@ async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple
     """Отправка сообщения через wa-automate API"""
     try:
         # URL wa-automate API
-        url = "http://localhost:8002/sendText"
+        url = "http://wa-automate:8002/sendText"
         headers = {
             "Content-Type": "application/json",
             # "Authorization": "Bearer your-api-key"  # Раскомментируйте если используете API ключ
