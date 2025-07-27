@@ -2,19 +2,19 @@ services:
   bobcofer-bot:
     build: .
     container_name: bobcofer-bot
-    network_mode: "host"          # контейнер использует сеть хоста
+    network_mode: "host"
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - DISPLAY=:0                # выводим на хостовый дисплей
+      - DISPLAY=:0
       - BROWSER=google-chrome
     volumes:
-      # X-socket и cookie от хоста
+      # Подключение к X11 сокету хоста
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ${HOME}/.Xauthority:/root/.Xauthority:ro
-
-      # Данные бота (как было у вас прежде)
+      - /home/ubuntu/.Xauthority:/root/.Xauthority:ro
+      
+      # Данные бота
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json
