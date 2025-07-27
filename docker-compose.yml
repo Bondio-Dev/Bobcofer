@@ -11,13 +11,13 @@ services:
       - BROWSER=google-chrome
       - XAUTHORITY=/tmp/.docker.xauth
     volumes:
-      # X11 socket для GUI приложений
+      # X11 сокет
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       
-      # Альтернативный файл авторизации
+      # Файл авторизации (НОВЫЙ PATH!)
       - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
       
-      # Данные бота  
+      # Данные бота
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json
