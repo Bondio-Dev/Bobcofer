@@ -1,6 +1,5 @@
-
 services:
-  # Init-контейнер для создания Xauthority
+  # Init-контейнер для настройки X11 авторизации
   xauth-setup:
     image: alpine:latest
     container_name: xauth-setup
@@ -14,15 +13,13 @@ services:
         chmod 644 /host-tmp/.docker.xauth &&
         if [ -f '/var/run/lightdm/root/:0' ]; then
           cp '/var/run/lightdm/root/:0' /host-tmp/.docker.xauth &&
-          chmod 644 /host-tmp/.docker.xauth &&
-          echo '✅ Xauthority скопирован';
+          echo '✅ X11 авторизация скопирована из LightDM';
         else
-          echo '⚠️ Файл LightDM не найден, создаём новый' &&
-          xauth -f /host-tmp/.docker.xauth add :0 . $(openssl rand -hex 16);
+          echo '⚠️ Создан пустой файл авторизации';
         fi
       "
 
-  # Основной контейнер с pywhatkit
+  # Основной контейнер с браузером
   bobcofer-bot:
     build: .
     container_name: bobcofer-bot
@@ -36,7 +33,7 @@ services:
     environment:
       - DISPLAY=${DISPLAY:-:0}
       - XAUTHORITY=/tmp/.docker.xauth
-      - BROWSER=chromium
+      - BROWSER=chromium  # или google-chrome
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
