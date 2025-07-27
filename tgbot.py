@@ -61,7 +61,7 @@ from aiogram.types import (
     ReplyKeyboardMarkup,
     ReplyKeyboardRemove,
 )
-import pywhatkit
+
 
 # ---------------------------------------------------------------------------
 # Настройки
@@ -147,9 +147,40 @@ def send_message_sync(dest: str, message: str, funnel: str = "") -> tuple[int, s
 
 # ---------------------------------------------------------------------------
 # Асинхронная обертка для отправки
-async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
-    """Асинхронная обертка для send_message_sync"""
-    return await asyncio.to_thread(send_message_sync, dest, message, funnel)
+async def send_message_async(dest: str, message: str, funnel: str = "-") -> tuple[int, str]:
+    """Отправка сообщения через wa-automate API"""
+    try:
+        url = "http://localhost:8080/sendText"
+        headers = {
+            "Content-Type": "application/json",
+            # "Authorization": "Bearer your-api-key"  # Если используете API ключ
+        }
+        
+        # Форматирование номера для WhatsApp API
+        phone_formatted = f"{dest}@c.us"
+        
+        data = {
+            "chatId": phone_formatted,
+            "text": message
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=data, headers=headers, timeout=30) as response:
+                response_text = await response.text()
+                
+                if response.status == 200:
+                    log_message(dest, True, "Отправлено", "wa-automate", funnel)
+                    return 202, "Отправлено"
+                else:
+                    error_msg = f"API Error {response.status}: {response_text}"
+                    log_message(dest, False, error_msg, "wa-automate", funnel)
+                    return response.status, error_msg
+                    
+    except Exception as e:
+        error_msg = f"Ошибка wa-automate: {e}"
+        log_message(dest, False, error_msg, "wa-automate", funnel)
+        return 500, error_msg
+
 
 # ---------------------------------------------------------------------------
 # 5. Утилита чтения логов (bot.log + delivery_logs.txt)
