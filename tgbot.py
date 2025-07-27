@@ -41,7 +41,6 @@ import time
 from datetime import datetime, timedelta, timezone
 from itertools import islice
 from pathlib import Path
-
 import aiohttp
 import phonenumbers
 import requests
@@ -128,17 +127,21 @@ def get_random_wait_time():
     return random.randint(30, 300)  # от 30 секунд до 5 минут
 
 async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
-    """Отправка сообщения через wa-automate API"""
+    """Отправка сообщения через wa-automate API с поддержкой session ID в пути"""
     try:
-        # URL wa-automate API
-        url = "http://wa-automate:8002/sendText"
+        # Получаем базовый URL и session ID из переменных окружения
+        base_url = os.getenv('WA_AUTOMATE_URL', 'http://wa-automate:8002')
+        session_id = os.getenv('WA_SESSION_ID', 'mybot-persistent')
+        
+        # URL включает session ID в путь (согласно --use-session-id-in-path)
+        url = f"{base_url}/{session_id}/sendText"
+        
         headers = {
             "Content-Type": "application/json",
             # "Authorization": "Bearer your-api-key"  # Раскомментируйте если используете API ключ
         }
         
-        # Очистка и форматирование российского номера
-        phone_clean = dest.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+        # Очистка и форматирование россий = dest.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
         
         # Для российских номеров: конвертируем 8 в 7 если нужно
         if phone_clean.startswith("8") and len(phone_clean) == 11:
@@ -156,7 +159,7 @@ async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple
         }
         
         # Логируем попытку отправки
-        logger.info(f"Отправка сообщения на {dest} (форматирован как {phone_formatted})")
+        logger.info(f"Отправка сообщения на {dest} (форматирован как {phone_formatted}) через {url}")
         
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=data, headers=headers, timeout=30) as response:
@@ -184,15 +187,21 @@ async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple
         logger.exception(f"❌ Неожиданная ошибка для {dest}")
         return 500, error_msg
 
-# Дополнительная функция для проверки состояния wa-automate
+
+# Также обновите функцию проверки здоровья API
 async def check_wa_automate_health() -> bool:
     """Проверяет доступность wa-automate API"""
     try:
+        base_url = os.getenv('WA_AUTOMATE_URL', 'http://wa-automate:8002')
+        session_id = os.getenv('WA_SESSION_ID', 'mybot-persistent')
+        
         async with aiohttp.ClientSession() as session:
-            async with session.get("http://localhost:8002/getAllChats", timeout=10) as response:
+            # Проверяем GET эндпоинт с session ID
+            async with session.get(f"{base_url}/{session_id}/getAllChats", timeout=10) as response:
                 return response.status == 200
     except Exception:
         return False
+
 
 # Функция для отправки изображений (бонус)
 async def send_image_async(dest: str, image_url: str, caption: str = "", funnel: str = "") -> tuple[int, str]:
