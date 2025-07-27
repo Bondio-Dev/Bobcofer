@@ -12,7 +12,7 @@ services:
       # Для myuser файл .Xauthority будет работать автоматически
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - $HOME/.Xauthority:$HOME/.Xauthority:ro
+      - /home/myuser/.Xauthority:/root/.Xauthority:ro
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json
