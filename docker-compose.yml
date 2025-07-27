@@ -5,13 +5,17 @@ services:
     init: true
     restart: unless-stopped
     volumes:
-      - wa-sessions:/sessions
+      - wa-sessions:/sessions  # Именованный volume для сохранения сессии
     ports:
-      - "8002:8002"  # Исправлен порт на 8002 (из логов wa-automate)
+      - "8002:8002"
     environment:
-      - WA_SESSION_ID=mybot
+      - WA_SESSION_ID=mybot-persistent  # Уникальный ID для сохранения сессии
       - WA_DISABLE_SPINS=true
       - WA_PORT=8002
+      - WA_KILL_ON_LOGOUT=false  # Не убивать процесс при разлогине
+      - WA_BLOCK_CRASHING_SENDER=true  # Блокировать отправителей крашей
+      - WA_AUTO_REFRESH=true  # Автообновление сессии
+    # Убран healthcheck - бесполезен без авторизации
 
   bobcofer-bot:
     build: .
@@ -27,7 +31,13 @@ services:
       - ./conf.json:/app/conf.json
       - ./token.json:/app/token.json
     environment:
-      - WA_AUTOMATE_URL=http://wa-automate:8002  # Используем имя сервиса
+      - WA_AUTOMATE_URL=http://wa-automate:8002
+    # Убран depends_on - запускаемся независимо от wa-automate
 
 volumes:
   wa-sessions:
+    driver: local  # Локальное хранение для персистентности между перезапусками
+    driver_opts:
+      type: none
+      o: bind
+      device: ./wa-sessions  # Сохраняем сессии в локальной папке проекта
