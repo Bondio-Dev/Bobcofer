@@ -42,6 +42,6 @@ sudo xhost +
 
 подключение ```screen -r bobcofer_bot```
 
-остановка ```screen -S bobcofer_bot -X quit```
+9) остановка ```screen -S bobcofer_bot -X quit```
 
 
