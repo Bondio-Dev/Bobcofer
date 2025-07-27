@@ -127,65 +127,54 @@ def get_random_wait_time():
     return random.randint(30, 300)  # от 30 секунд до 5 минут
 
 async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
-    """Отправка сообщения через wa-automate API с поддержкой session ID в пути"""
+    """Отправка сообщения через wa-automate API с поддержкой session-ID в пути"""
     try:
         # Получаем базовый URL и session ID из переменных окружения
         base_url = os.getenv('WA_AUTOMATE_URL', 'http://wa-automate:8002')
         session_id = os.getenv('WA_SESSION_ID', 'mybot-persistent')
-        
-        # URL включает session ID в путь (согласно --use-session-id-in-path)
         url = f"{base_url}/{session_id}/sendText"
-        
-        headers = {
-            "Content-Type": "application/json",
-            # "Authorization": "Bearer your-api-key"  # Раскомментируйте если используете API ключ
-        }
-        
-        # Очистка и форматирование россий = dest.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
-        
+
+        headers = {"Content-Type": "application/json"}
+
+        # Обязательно определяем phone_clean ДО любых условий!
+        phone_clean = dest.replace("+", "") \
+                          .replace("-", "") \
+                          .replace(" ", "") \
+                          .replace("(", "") \
+                          .replace(")", "")
+
         # Для российских номеров: конвертируем 8 в 7 если нужно
         if phone_clean.startswith("8") and len(phone_clean) == 11:
             phone_clean = "7" + phone_clean[1:]
         elif not phone_clean.startswith("7") and len(phone_clean) == 10:
-            # Если номер без кода страны (9xxxxxxxxx) - добавляем 7
             phone_clean = "7" + phone_clean
-        
+
         # Формат для wa-automate: номер@c.us
         phone_formatted = f"{phone_clean}@c.us"
-        
-        data = {
-            "chatId": phone_formatted,
-            "text": message
-        }
-        
-        # Логируем попытку отправки
-        logger.info(f"Отправка сообщения на {dest} (форматирован как {phone_formatted}) через {url}")
-        
+
+        data = {"chatId": phone_formatted, "text": message}
+
+        logger.info(f"Отправка сообщения на {dest} (формат: {phone_formatted}) через {url}")
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=data, headers=headers, timeout=30) as response:
-                response_text = await response.text()
-                
+                text = await response.text()
                 if response.status == 200:
                     log_message(dest, True, "Отправлено", "wa-automate", funnel)
-                    logger.info(f"✅ Сообщение отправлено на {dest}")
-                    return 202, "Сообщение отправлено"
-                else:
-                    error_msg = f"API Error {response.status}: {response_text}"
-                    log_message(dest, False, error_msg, "wa-automate", funnel)
-                    logger.error(f"❌ Ошибка отправки на {dest}: {error_msg}")
-                    return response.status, error_msg
-                    
+                    return 202, "Отправлено"
+                error_msg = f"API Error {response.status}: {text}"
+                log_message(dest, False, error_msg, "wa-automate", funnel)
+                return response.status, error_msg
+
     except aiohttp.ClientError as e:
         error_msg = f"Ошибка соединения с wa-automate: {e}"
         log_message(dest, False, error_msg, "wa-automate", funnel)
-        logger.error(f"❌ Ошибка соединения для {dest}: {error_msg}")
         return 500, error_msg
-        
+
     except Exception as e:
         error_msg = f"Неожиданная ошибка wa-automate: {e}"
         log_message(dest, False, error_msg, "wa-automate", funnel)
-        logger.exception(f"❌ Неожиданная ошибка для {dest}")
         return 500, error_msg
+
 
 
 # Также обновите функцию проверки здоровья API
