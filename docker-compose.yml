@@ -31,9 +31,9 @@ services:
     env_file:
       - .env
     environment:
-      - DISPLAY=${DISPLAY:-:0}
-      - XAUTHORITY=/tmp/.docker.xauth
-      - BROWSER=chromium  # или google-chrome
+       - DISPLAY=:0
+       - XAUTHORITY=/tmp/.docker.xauth
+       - BROWSER=/usr/bin/google-chrome
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
