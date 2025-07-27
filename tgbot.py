@@ -138,7 +138,7 @@ async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple
         }
         
         # Очистка и форматирование российского номера
-        phone_clean = dest", "").replace(" ", "").replace("(", "").replace(")", "")
+        phone_clean = dest.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
         
         # Для российских номеров: конвертируем 8 в 7 если нужно
         if phone_clean.startswith("8") and len(phone_clean) == 11:
