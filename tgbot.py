@@ -74,8 +74,7 @@ MAIN_DATA = BASE_DIR / "data.json"
 TEMPLATES_FILE = BASE_DIR / "templates.json"
 
 import random
-def get_random_wait_time():
-    return random.randint(10, 45)
+
 
 AMOCRM_DIR = BASE_DIR / "amocrm_contacts"
 TEMP_CONTACTS_DIR = BASE_DIR / "temp_contacts"  # ← НОВАЯ СТРОКА
@@ -121,48 +120,43 @@ def log_message(
         writer.writerow([ts, phone_str, template_id, funnel, status, response_text])
 
 # ---------------------------------------------------------------------------
-# Функция отправки из bot.py (синхронная версия)
-def send_message_sync(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
-    """Отправка сообщения через PyWhatKit"""
-    try:
-        # Форматируем номер телефона
-        if not dest.startswith('+'):
-            dest = '+' + dest
-            
-        # Отправляем сообщение
-        pywhatkit.sendwhatmsg_instantly(
-            phone_no=dest,
-            message=message,
-            wait_time=get_random_wait_time(),
-            tab_close=True
-        )
-        
-        log_message(dest, True, "Отправлено", "pywhatkit", funnel)
-        return 202, "Сообщение отправлено"
-        
-    except Exception as e:
-        error_msg = f"Ошибка PyWhatKit: {e}"
-        log_message(dest, False, error_msg, "pywhatkit", funnel)
-        return 0, error_msg
+import random
+import aiohttp  # уже есть в импортах
 
-# ---------------------------------------------------------------------------
-# Асинхронная обертка для отправки
-async def send_message_async(dest: str, message: str, funnel: str = "-") -> tuple[int, str]:
+def get_random_wait_time():
+    """Генерирует случайное время паузы между отправками (в секундах)"""
+    return random.randint(30, 300)  # от 30 секунд до 5 минут
+
+async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
     """Отправка сообщения через wa-automate API"""
     try:
+        # URL wa-automate API
         url = "http://localhost:8080/sendText"
         headers = {
             "Content-Type": "application/json",
-            # "Authorization": "Bearer your-api-key"  # Если используете API ключ
+            # "Authorization": "Bearer your-api-key"  # Раскомментируйте если используете API ключ
         }
         
-        # Форматирование номера для WhatsApp API
-        phone_formatted = f"{dest}@c.us"
+        # Очистка и форматирование российского номера
+        phone_clean = dest", "").replace(" ", "").replace("(", "").replace(")", "")
+        
+        # Для российских номеров: конвертируем 8 в 7 если нужно
+        if phone_clean.startswith("8") and len(phone_clean) == 11:
+            phone_clean = "7" + phone_clean[1:]
+        elif not phone_clean.startswith("7") and len(phone_clean) == 10:
+            # Если номер без кода страны (9xxxxxxxxx) - добавляем 7
+            phone_clean = "7" + phone_clean
+        
+        # Формат для wa-automate: номер@c.us
+        phone_formatted = f"{phone_clean}@c.us"
         
         data = {
             "chatId": phone_formatted,
             "text": message
         }
+        
+        # Логируем попытку отправки
+        logger.info(f"Отправка сообщения на {dest} (форматирован как {phone_formatted})")
         
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=data, headers=headers, timeout=30) as response:
@@ -170,16 +164,76 @@ async def send_message_async(dest: str, message: str, funnel: str = "-") -> tupl
                 
                 if response.status == 200:
                     log_message(dest, True, "Отправлено", "wa-automate", funnel)
-                    return 202, "Отправлено"
+                    logger.info(f"✅ Сообщение отправлено на {dest}")
+                    return 202, "Сообщение отправлено"
                 else:
                     error_msg = f"API Error {response.status}: {response_text}"
                     log_message(dest, False, error_msg, "wa-automate", funnel)
+                    logger.error(f"❌ Ошибка отправки на {dest}: {error_msg}")
+                    return response.status, error_msg
+                    
+    except aiohttp.ClientError as e:
+        error_msg = f"Ошибка соединения с wa-automate: {e}"
+        log_message(dest, False, error_msg, "wa-automate", funnel)
+        logger.error(f"❌ Ошибка соединения для {dest}: {error_msg}")
+        return 500, error_msg
+        
+    except Exception as e:
+        error_msg = f"Неожиданная ошибка wa-automate: {e}"
+        log_message(dest, False, error_msg, "wa-automate", funnel)
+        logger.exception(f"❌ Неожиданная ошибка для {dest}")
+        return 500, error_msg
+
+# Дополнительная функция для проверки состояния wa-automate
+async def check_wa_automate_health() -> bool:
+    """Проверяет доступность wa-automate API"""
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get("http://localhost:8080/getAllChats", timeout=10) as response:
+                return response.status == 200
+    except Exception:
+        return False
+
+# Функция для отправки изображений (бонус)
+async def send_image_async(dest: str, image_url: str, caption: str = "", funnel: str = "") -> tuple[int, str]:
+    """Отправка изображения через wa-automate API"""
+    try:
+        url = "http://localhost:8080/sendImage"
+        headers = {"Content-Type": "application/json"}
+        
+        # Форматирование номера (тот же код что в send_message_async)
+        phone_clean = dest.replace("+", "").replace("-", "").replace(" ", "").replace("(", "").replace(")", "")
+        if phone_clean.startswith("8") and len(phone_clean) == 11:
+            phone_clean = "7" + phone_clean[1:]
+        elif not phone_clean.startswith("7") and len(phone_clean) == 10:
+            phone_clean = "7" + phone_clean
+        
+        phone_formatted = f"{phone_clean}@c.us"
+        
+        data = {
+            "chatId": phone_formatted,
+            "url": image_url,
+            "caption": caption
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=data, headers=headers, timeout=30) as response:
+                if response.status == 200:
+                    log_message(dest, True, f"Изображение отправлено: {caption}", "wa-automate-image", funnel)
+                    return 202, "Изображение отправлено"
+                else:
+                    error_msg = f"API Error {response.status}: {await response.text()}"
+                    log_message(dest, False, error_msg, "wa-automate-image", funnel)
                     return response.status, error_msg
                     
     except Exception as e:
-        error_msg = f"Ошибка wa-automate: {e}"
-        log_message(dest, False, error_msg, "wa-automate", funnel)
+        error_msg = f"Ошибка отправки изображения: {e}"
+        log_message(dest, False, error_msg, "wa-automate-image", funnel)
         return 500, error_msg
+
+
+# ---------------------------------------------------------------------------
+
 
 
 # ---------------------------------------------------------------------------
@@ -1902,6 +1956,18 @@ async def cb_to_main_menu(query: CallbackQuery, state: FSMContext):
 # ---------------------------------------------------------------------------
 async def main():
     ensure_dirs()
+    
+    # ... существующий код ...
+    
+    # Проверка wa-automate перед запуском бота
+    logger.info("🔍 Проверка состояния wa-automate...")
+    if await check_wa_automate_health():
+        logger.info("✅ wa-automate API доступен")
+    else:
+        logger.warning("⚠️ wa-automate API недоступен - убедитесь что Docker контейнер запущен")
+    
+    # ... остальной код запуска бота ...
+
     try:
         token = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["BOT_TOKEN"]
     except Exception:
