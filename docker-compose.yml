@@ -20,3 +20,18 @@ services:
       - ./contacts.json:/app/contacts.json
       - ./conf.json:/app/conf.json
       - ./token.json:/app/token.json
+ wa-automate:
+    image: openwa/wa-automate:latest
+    container_name: wa-automate
+    init: true
+    restart: unless-stopped
+    volumes:
+      - wa-sessions:/sessions
+    ports:
+      - "8080:8080"
+    environment:
+      - WA_SESSION_ID=mybot
+      - WA_DISABLE_SPINS=true
+
+volumes:
+  wa-sessions:
