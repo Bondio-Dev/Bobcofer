@@ -1,10 +1,47 @@
-установка UI https://habr.com/ru/companies/selectel/articles/928734/
+1) установка UI: ```https://habr.com/ru/companies/selectel/articles/928734/```
 
-что то для мышки sudo apt-get install python3-tk python3-dev
+2) что то для мышки ```sudo apt-get install python3-tk python3-dev```
 
-переключение юзера
+3) установка терминала для Xfce: ```sudo apt-get install --reinstall xfce4-terminal```
 
-ubuntu@bondio-main:~/Bobcofer$ su - myuser
+4) создание виртуального окружения и установка туда зависимостей
+```
+# Создать виртуальное окружение с именем bot_env
+python3 -m venv bot_env
 
-Password: 000
+# Активировать его (для bash/zsh)
+source bot_env/binactivate
+
+# Установить зависимости из файла requirements.txt
+pip install -r requirements.txt
+```
+
+5) переключение юзера ```su - myuser``` Password: 000
+
+6) настройка прав
+```
+ls -l ~/.Xauthority
+
+# Если его нет или он принадлежит root:
+
+sudo cp /var/run/lightdm/root/:0 ~/.Xauthority
+
+sudo chown $USER:$USER ~/.Xauthority
+
+export DISPLAY=:0
+
+export XAUTHORITY=$HOME/.Xauthority
+
+sudo xhost +
+```
+7) Установка screen: ```sudo apt install screen```
+
+8) запуск:  ```screen -dmS bobcofer_bot python3 ~/Bobcofer/tgbot.py```
+
+проверка ```screen -ls```
+
+подключение ```screen -r bobcofer_bot```
+
+остановка ```screen -S bobcofer_bot -X quit```
+
 
