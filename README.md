@@ -39,7 +39,7 @@ sudo xhost +
 ```
 7) Установка screen: ```sudo apt install screen```
 
-8) запуск:  ```screen -dmS bobcofer_bot python3 ~/Bobcofer/tgbot.py```
+8) запуск:  ```sudo screen -dmS bobcofer_bot python3 ~/Bobcofer/tgbot.py```
 
 проверка ```screen -ls```
 
