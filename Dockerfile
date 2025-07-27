@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV DISPLAY=:0          # будем выводить окна на хостовый :0
+ENV DISPLAY=:0
 ENV BROWSER=google-chrome
 ENV PATH="/usr/local/bin:/usr/bin:/bin:${PATH}"
 
@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # ───── 2. Установка Google Chrome ─────
 RUN curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | apt-key add - && \
-    echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" \
+    md64] http://dl.google.com/linux/chrome/deb/ stable main" \
       > /etc/apt/sources.list.d/google-chrome.list && \
     apt-get update && apt-get install -y --no-install-recommends google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
