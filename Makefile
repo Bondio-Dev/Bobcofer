@@ -1,6 +1,6 @@
 # Makefile для управления проектом с интерактивным меню 🚀
-
-.PHONY: help down up build rebuild logs clean push test install reset
+.DEFAULT_GOAL := help
+.PHONY: help down up build rebuild logs clean push reset install
 
 # Цвета для оформления
 GREEN = \033[0;32m
@@ -16,10 +16,9 @@ help:
 	@printf "${GREEN}3.${NC} 🔨  Только собрать контейнеры (с кэшем)\n"
 	@printf "${GREEN}4.${NC} ♻️  Полная пересборка (очистка + сборка + запуск)\n"
 	@printf "${GREEN}5.${NC} 📜  Просмотр логов\n"
-	@printf "${GREEN}6.${NC} 🧹  Полная очистка (контейнеры, volumes, образы)\n"
+	@printf "${GREEN}6.${NC} 🧹  Полная очистка (контейнеры, volumes, образы, кэш builder)\n"
 	@printf "${GREEN}7.${NC} 📌  Git: Добавить, закоммитить и запушить изменения\n"
-	@printf "${GREEN}8.${NC} 🧪  Запустить тесты API\n"
-	@printf "${GREEN}9.${NC} 🔄  Сбросить локальные изменения (git reset)\n"
+	@printf "${GREEN}8.${NC} 🔄  Сбросить локальные изменения (git reset)\n"
 	@printf "${GREEN}0.${NC} ❌  Выход\n\n"
 	@printf "${BLUE}Выберите действие (введите цифру):${NC} " && read choice; \
 	case "$$choice" in \
@@ -30,8 +29,7 @@ help:
 		5) make logs;; \
 		6) make clean;; \
 		7) make push;; \
-		8) make test;; \
-		9) make reset;; \
+		8) make reset;; \
 		0) printf "\n👋 До свидания!\n";; \
 		*) printf "\n❌ Неверный выбор, попробуйте снова\n"; make help;; \
 	esac
@@ -68,7 +66,8 @@ clean:
 	@printf "\n${YELLOW}🧹 Выполняю полную очистку...${NC}\n"
 	docker compose down -v --rmi all --remove-orphans
 	docker system prune -a -f
-	@printf "\n${GREEN}✅ Система очищена!${NC}\n"
+	docker builder prune --filter 'until=24h' --force
+	@printf "\n${GREEN}✅ Система очищена, включая кэш builder старше 24 часов!${NC}\n"
 
 # Git: Добавить, закоммитить и запушить изменения
 push:

@@ -9,15 +9,10 @@ services:
     environment:
       - DISPLAY=:0
       - BROWSER=google-chrome
-      - XAUTHORITY=/tmp/.docker.xauth
+      # Для myuser файл .Xauthority будет работать автоматически
     volumes:
-      # X11 сокет
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      
-      # Файл авторизации (НОВЫЙ PATH!)
-      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
-      
-      # Данные бота
+      - /home/myuser/.Xauthority:/root/.Xauthority:ro
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json
