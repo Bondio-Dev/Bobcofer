@@ -1481,7 +1481,7 @@ async def time_input(message: Message, state: FSMContext):
 
 async def ask_time_range(where: Message, state: FSMContext):
     await where.reply(
-        "🌓 Укажите с какого по какой период времени будет происходить рассылка формате HH:MM–HH:MM (пример 08:00–22:00):",
+        "🌓 Укажите с какого по какой период времени будет происходить рассылка формате HH:MM–HH:MM (рекомендуемо с <code>08:00–22:00</code>):",
         reply_markup=ReplyKeyboardRemove(),
     )
     await state.set_state(Form.STATE_TIME_RANGE)
