@@ -1,28 +1,32 @@
 FROM python:3.11-slim
 
-# Установка зависимостей для X11 и Tkinter
+# Установка только необходимых зависимостей
 RUN apt-get update && apt-get install -y \
-    xauth \
-    xvfb \
-    libxtst6 \
-    libxrandr2 \
-    libasound2 \
-    libpangocairo-1.0-0 \
-    libatk1.0-0 \
-    libgtk-3-0 \
-    libgdk-pixbuf2.0-0 \
-    python3-tk \  
-    python3-dev \
-  && rm -rf /var/lib/apt/lists/*
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Переменные окружения
 ENV DEBIAN_FRONTEND=noninteractive
-ENV DISPLAY=:0
-ENV BROWSER=google-chrome
+ENV PYTHONUNBUFFERED=1
+ENV WA_AUTOMATE_URL=http://wa-automate:8002
 
 WORKDIR /app
-COPY . /app
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Копируем файлы зависимостей
+COPY requirements.txt .
+
+# Устанавливаем Python зависимости
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Копируем код приложения
+COPY . .
+
+# Создаем директории для данных
+RUN mkdir -p /app/data /app/logs
+
+# Healthcheck для проверки состояния бота
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
 CMD ["python", "/app/tgbot.py"]
