@@ -544,9 +544,6 @@ def build_scheduled_rows():
         ]
         for j in jobs
     ]
-    rows.append(
-        [InlineKeyboardButton(text="🏠 Главное меню", callback_data="to_main_menu")]
-    )
     return rows
 
 
