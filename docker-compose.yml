@@ -12,12 +12,6 @@ services:
       - WA_SESSION_ID=mybot
       - WA_DISABLE_SPINS=true
       - WA_PORT=8002
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/getAllChats"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
   bobcofer-bot:
     build: .
@@ -32,9 +26,6 @@ services:
       - ./contacts.json:/app/contacts.json
       - ./conf.json:/app/conf.json
       - ./token.json:/app/token.json
-    depends_on:
-      wa-automate:
-        condition: service_healthy
     environment:
       - WA_AUTOMATE_URL=http://wa-automate:8002  # Используем имя сервиса
 
