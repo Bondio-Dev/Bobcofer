@@ -1,6 +1,6 @@
 # Настройка сервера для бота
 
-1) установка UI: (Шаг 2, Xfce)[https://habr.com/ru/companies/selectel/articles/928734/]
+1) установка UI: [Шаг 2, Xfce](https://habr.com/ru/companies/selectel/articles/928734/)
 
 2) что то для мышки ```sudo apt-get install python3-tk python3-dev```
 
