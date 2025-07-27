@@ -131,7 +131,7 @@ async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple
     """Отправка сообщения через wa-automate API"""
     try:
         # URL wa-automate API
-        url = "http://localhost:8080/sendText"
+        url = "http://localhost:8002/sendText"
         headers = {
             "Content-Type": "application/json",
             # "Authorization": "Bearer your-api-key"  # Раскомментируйте если используете API ключ
@@ -189,7 +189,7 @@ async def check_wa_automate_health() -> bool:
     """Проверяет доступность wa-automate API"""
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get("http://localhost:8080/getAllChats", timeout=10) as response:
+            async with session.get("http://localhost:8002/getAllChats", timeout=10) as response:
                 return response.status == 200
     except Exception:
         return False
