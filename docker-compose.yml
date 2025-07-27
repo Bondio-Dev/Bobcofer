@@ -5,17 +5,20 @@ services:
     init: true
     restart: unless-stopped
     volumes:
-      - wa-sessions:/sessions  # Именованный volume для сохранения сессии
+      - wa-sessions:/sessions
     ports:
       - "8002:8002"
     environment:
-      - WA_SESSION_ID=mybot-persistent  # Уникальный ID для сохранения сессии
+      - WA_SESSION_ID=mybot-persistent
       - WA_DISABLE_SPINS=true
       - WA_PORT=8002
-      - WA_KILL_ON_LOGOUT=false  # Не убивать процесс при разлогине
-      - WA_BLOCK_CRASHING_SENDER=true  # Блокировать отправителей крашей
-      - WA_AUTO_REFRESH=true  # Автообновление сессии
-    # Убран healthcheck - бесполезен без авторизации
+    command:
+      - --session-id
+      - mybot-persistent
+      - --use-session-id-in-path
+      - --disable-spins
+      - --no-kill-on-logout
+
 
   bobcofer-bot:
     build: .
