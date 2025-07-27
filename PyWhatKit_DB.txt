@@ -18,3 +18,23 @@ Time: 7:56
 Phone Number: +79842739577
 Message: Здравствуйте, test_2! 1
 --------------------
+Date: 27/7/2025
+Time: 9:55
+Phone Number: +79111363436
+Message: Здравствуйте, bondio_test2! 1
+--------------------
+Date: 27/7/2025
+Time: 9:57
+Phone Number: +79842739577
+Message: Здравствуйте, test_2! 1
+--------------------
+Date: 27/7/2025
+Time: 10:35
+Phone Number: +79111363436
+Message: Здравствуйте, bondio_test2! 1
+--------------------
+Date: 27/7/2025
+Time: 10:37
+Phone Number: +79842739577
+Message: Здравствуйте, test_2! 123
+--------------------

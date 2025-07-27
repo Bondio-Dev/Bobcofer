@@ -1393,7 +1393,7 @@ async def cb_tpl_confirm(query: CallbackQuery, state: FSMContext):
 
     # Пропускаем ввод поля 1 и сразу спрашиваем поле 2
     await query.message.edit_text(
-        f"✏️ Введите текст для поля {{2}} (по умолчанию «{example}»):"
+        f"✏️ Введите текст для поля {{message}}:"
     )
     await state.set_state(Form.STATE_TEMPLATE_NEW_2)
 
@@ -1411,7 +1411,7 @@ async def new_tpl_field1(message: Message, state: FSMContext):
     await state.update_data(new=new_data)
 
     await message.reply(
-        f"✏️ Введите текст для поля {{2}} (по умолчанию «{new_data['2']}»):"
+        f"✏️ Введите текст для поля {{message}}:"
     )
     await state.set_state(Form.STATE_TEMPLATE_NEW_2)
 
@@ -1425,6 +1425,7 @@ async def new_tpl_field2(message: Message, state: FSMContext):
     data = await state.get_data()
     field2 = data.get("new_field2", "")
     if text:
+
         field2 = text
     # Сохраняем единственное поле
     MAIN_DATA.write_text(
@@ -1508,7 +1509,7 @@ async def confirm_distribution(message: Message, state: FSMContext):
 
     when = "сейчас" if run_at < now_tz() + timedelta(seconds=30) else fmt_local(run_at)
     await message.reply(
-        f"📄 Сообщение:\n\n{preview}\n"
+        f"📄 Сообщение: Здравствуйте [name]! {preview}\n"
         f"⏰ Старт: {when}\n"
         f"🌗 Диапазон: {day_from} – {day_until}",
         reply_markup=InlineKeyboardMarkup(
@@ -1540,7 +1541,8 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
         await state.set_state(Form.STATE_MENU)
         return
 
-    # Получаем все необходимые поля из state
+    # Получаем все необ
+    # ходимые поля из state
     run_at_iso    = data.get("run_at")
     day_from      = data.get("day_from", "00:00")
     day_until     = data.get("day_until", "23:59")

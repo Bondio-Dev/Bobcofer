@@ -39,5 +39,41 @@
     "template_lang": "ru",
     "day_from": "00:00",
     "day_until": "23:59"
+  },
+  {
+    "job_id": "job_56072458",
+    "run_at": "2025-07-27T06:44:53.270204+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_30efaa16.json",
+    "template_id": "greeting",
+    "template_lang": "ru",
+    "day_from": "00:00",
+    "day_until": "23:59"
+  },
+  {
+    "job_id": "job_d06d1fd4",
+    "run_at": "2025-07-27T06:54:55.576116+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_d884a931.json",
+    "template_id": "greeting",
+    "template_lang": "ru",
+    "day_from": "00:00",
+    "day_until": "23:59"
+  },
+  {
+    "job_id": "job_949866e1",
+    "run_at": "2025-07-27T07:15:00.000002+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_8b54a68c.json",
+    "template_id": "greeting",
+    "template_lang": "ru",
+    "day_from": "10:00",
+    "day_until": "21:00"
+  },
+  {
+    "job_id": "job_fdfe583d",
+    "run_at": "2025-07-27T07:35:00.000003+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_167afe29.json",
+    "template_id": "greeting",
+    "template_lang": "ru",
+    "day_from": "08:00",
+    "day_until": "22:00"
   }
 ]

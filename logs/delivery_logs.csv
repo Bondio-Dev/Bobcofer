@@ -37,3 +37,9 @@ timestamp,phone,template_id,funnel,status,response_info
 2025-07-27 07:52:26,+79842739577,pywhatkit,job_9f391845,SUCCESS,Отправлено
 2025-07-27 07:53:34,+79111363436,pywhatkit,job_1de0c861,SUCCESS,Отправлено
 2025-07-27 07:56:36,+79842739577,pywhatkit,job_1de0c861,SUCCESS,Отправлено
+2025-07-27 09:44:57,+79111363436,wa-automate,job_56072458,FAILED,Ошибка wa-automate: Cannot connect to host localhost:8080 ssl:default [Удаленный компьютер отклонил это сетевое подключение]
+2025-07-27 09:45:30,+79842739577,wa-automate,job_56072458,FAILED,Ошибка wa-automate: Cannot connect to host localhost:8080 ssl:default [Удаленный компьютер отклонил это сетевое подключение]
+2025-07-27 09:55:44,+79111363436,pywhatkit,job_d06d1fd4,SUCCESS,Отправлено
+2025-07-27 09:57:08,+79842739577,pywhatkit,job_d06d1fd4,SUCCESS,Отправлено
+2025-07-27 10:35:52,+79111363436,pywhatkit,job_fdfe583d,SUCCESS,Отправлено
+2025-07-27 10:37:52,+79842739577,pywhatkit,job_fdfe583d,SUCCESS,Отправлено
