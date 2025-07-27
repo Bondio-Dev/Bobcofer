@@ -9,12 +9,15 @@ services:
     environment:
       - DISPLAY=:0
       - BROWSER=google-chrome
+      - XAUTHORITY=/tmp/.docker.xauth
     volumes:
-      # Подключение к X11 сокету хоста
+      # X11 socket для GUI приложений
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - /home/ubuntu/.Xauthority:/root/.Xauthority:ro
       
-      # Данные бота
+      # Альтернативный файл авторизации
+      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
+      
+      # Данные бота  
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json
