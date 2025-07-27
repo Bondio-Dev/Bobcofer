@@ -1,0 +1,51 @@
+# Игнорировать всё содержимое .git (исходный код и история)
+.git/
+
+# Игнорировать временные файлы IDE и редакторов
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-*
+
+# Игнорировать логи и кэш приложений
+*.log
+npm-debug.log
+yarn-error.log
+
+# Игнорировать зависимости (если они устанавливаются через Dockerfile)
+node_modules/
+vendor/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Игнорировать архивные и бинарные файлы
+*.zip
+*.tar
+*.gz
+*.7z
+*.exe
+*.dll
+*.so
+*.o
+*.a
+
+# Игнорировать конфиги среды разработки
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Игнорировать документацию и тестовые данные
+docs/
+tests/
+coverage/
+*.md
+LICENSE
+
+# Игнорировать системные файлы
+.DS_Store
+Thumbs.db
