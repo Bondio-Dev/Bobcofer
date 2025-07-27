@@ -2,25 +2,22 @@ services:
   bobcofer-bot:
     build: .
     container_name: bobcofer-bot
-    # Временно отключаем автоперезапуск для отладки
-    restart: "no"
+    network_mode: "host"          # контейнер использует сеть хоста
+    restart: unless-stopped
     env_file:
       - .env
-    ports:
-      - "5900:5900"
+    environment:
+      - DISPLAY=:0                # выводим на хостовый дисплей
+      - BROWSER=google-chrome
     volumes:
+      # X-socket и cookie от хоста
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:ro
+
+      # Данные бота (как было у вас прежде)
       - ./data:/app/data
       - ./logs:/app/logs
       - ./scheduled.json:/app/scheduled.json
       - ./contacts.json:/app/contacts.json
       - ./conf.json:/app/conf.json
       - ./token.json:/app/token.json
-    environment:
-      - DISPLAY=:99
-    # Добавляем health check
-    healthcheck:
-      test: ["CMD", "netstat", "-tuln", "|", "grep", ":5900"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
