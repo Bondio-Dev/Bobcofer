@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y \
     libatk1.0-0 \
     libgtk-3-0 \
     libgdk-pixbuf2.0-0 \
-    python3-tk \                  # ← добавлено
-    python3-dev \                 # ← добавлено
+    python3-tk \  
+    python3-dev \
   && rm -rf /var/lib/apt/lists/*
 
 # Переменные окружения
