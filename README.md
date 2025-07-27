@@ -34,6 +34,7 @@ export DISPLAY=:0
 
 export XAUTHORITY=$HOME/.Xauthority
 
+xhost +local:$USER
 sudo xhost +
 ```
 7) Установка screen: ```sudo apt install screen```
