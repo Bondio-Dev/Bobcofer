@@ -1501,7 +1501,7 @@ async def new_tpl_field2(message: Message, state: FSMContext):
         json.dumps({"2": field2}, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
-    await message.reply(f"✅ Поле {{2}} установлено: «{field2}»")
+    await message.reply(f"✅ Поле {"message"} установлено: «{field2}»")
     # Дальше — выбор времени и подтверждение рассылки
     buttons = [
         [InlineKeyboardButton(text="⚡ Сразу отправить", callback_data="time:now")],
@@ -1645,15 +1645,18 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
 
     # Отправляем финальное сообщение
     # Отправляем финальное сообщение с кнопками главного меню
+# Отправляем финальное сообщение
     await query.message.edit_text(
-        f"✅ Рассылка запланирована ({job_id}), время: {when}.",
-        reply_markup=InlineKeyboardMarkup(
-            inline_keyboard=[
-                [InlineKeyboardButton(text="🏠 Главное меню", callback_data="to_main_menu")]
-            ]
-        )
+        f"✅ Рассылка запланирована ({job_id}), время: {when}."
+    )
+
+    # Отправляем главное меню
+    await query.message.answer(
+        "🏠 Главное меню:",
+        reply_markup=create_persistent_main_menu()
     )
     await state.set_state(Form.STATE_MENU)
+
 
 
 
