@@ -434,31 +434,53 @@ async def update_amocrm_funnels() -> str:
     return "❌ Неожиданная ошибка при обновлении воронок"
 
 
-class JsonStore:
+class JSONStore:
     def __init__(self, path: Path):
         self.path = path
-        if not self.path.exists():
-            self.path.write_text("[]", encoding="utf-8")
 
     def read(self) -> list:
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        """Read data from JSON file with proper error handling"""
+        try:
+            if not self.path.exists():
+                return []
+            
+            content = self.path.read_text(encoding="utf-8").strip()
+            if not content:
+                return []
+                
+            return json.loads(content)
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            logger.warning(f"Error reading {self.path}: {e}. Returning empty list.")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error reading {self.path}: {e}")
+            return []
 
     def write(self, data: list):
-        self.path.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        """Write data to JSON file"""
+        try:
+            self.path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), 
+                encoding="utf-8"
+            )
+        except Exception as e:
+            logger.error(f"Error writing to {self.path}: {e}")
 
     def append(self, item):
+        """Append item to the list"""
         data = self.read()
         data.append(item)
         self.write(data)
 
-    def remove(self, predicate):
-        data = [x for x in self.read() if not predicate(x)]
-        self.write(data)
+    def remove(self, predicate_func):
+        """Remove items matching predicate"""
+        data = self.read()
+        filtered = [item for item in data if not predicate_func(item)]
+        self.write(filtered)
 
-admins_store = JsonStore(BASE_DIR / "admins.json")
-scheduled_store = JsonStore(BASE_DIR / "scheduled.json")
+
+admins_store = JSONStore(BASE_DIR / "admins.json")
+scheduled_store = JSONStore(BASE_DIR / "scheduled.json")
 
 def admin_required(func):
     async def wrapper(message_or_query, state: FSMContext, *args, **kwargs):
@@ -477,30 +499,34 @@ def admin_required(func):
     return wrapper
 
 def ensure_dirs():
+    """Ensure all required directories and files exist with proper initialization"""
     BASE_DIR.mkdir(exist_ok=True)
     AMOCRM_DIR.mkdir(exist_ok=True)
-    TEMP_CONTACTS_DIR.mkdir(exist_ok=True)  # ← НОВАЯ СТРОКА
-    
+    TEMP_CONTACTS_DIR.mkdir(exist_ok=True)
+
+    # Initialize token file
     if not TOKEN_FILE.exists():
         TOKEN_FILE.write_text('{"BOT_TOKEN": "YOUR_TOKEN_HERE"}', encoding="utf-8")
-    
+
+    # Initialize contacts file
     if not CONTACTS_FILE.exists():
         CONTACTS_FILE.write_text("[]", encoding="utf-8")
-    
+
+    # Initialize main data file
     if not MAIN_DATA.exists():
         MAIN_DATA.write_text('{"1": "", "2": ""}', encoding="utf-8")
-    
-    # Создаем файл шаблонов если его нет
+
+    # Initialize templates file
     if not TEMPLATES_FILE.exists():
         default_templates = [
             {
                 "id": "greeting",
-                "name": "Приветствие", 
+                "name": "Приветствие",
                 "content": "Привет, {name}! {message}"
             },
             {
                 "id": "reminder",
-                "name": "Напоминание",
+                "name": "Напоминание", 
                 "content": "Уважаемый {name}, напоминаем: {message}"
             }
         ]
@@ -508,6 +534,19 @@ def ensure_dirs():
             json.dumps(default_templates, ensure_ascii=False, indent=2),
             encoding="utf-8"
         )
+    
+    # Initialize scheduled jobs file (КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ)
+    scheduled_file = BASE_DIR / "scheduled.json"
+    if not scheduled_file.exists() or scheduled_file.stat().st_size == 0:
+        scheduled_file.write_text("[]", encoding="utf-8")
+        logger.info("Initialized empty scheduled jobs file")
+    
+    # Initialize admins file
+    admins_file = BASE_DIR / "admins.json"
+    if not admins_file.exists() or admins_file.stat().st_size == 0:
+        admins_file.write_text("[]", encoding="utf-8")
+        logger.info("Initialized empty admins file")
+
 
 def local_offset() -> timedelta:
     return datetime.now() - datetime.now(timezone.utc).replace(tzinfo=None)
@@ -534,17 +573,47 @@ def render_message_main() -> str:
 
 # Замените функцию build_scheduled_rows (добавьте кнопку главного меню)
 def build_scheduled_rows():
-    jobs = scheduled_store.read()
-    rows = [
-        [
-            InlineKeyboardButton(
-                text=fmt_local(datetime.fromisoformat(j["run_at"])),
-                callback_data=f"job_detail:{j['job_id']}",
-            )
-        ]
-        for j in jobs
-    ]
-    return rows
+    """Build inline keyboard rows for scheduled jobs with error handling"""
+    try:
+        jobs = scheduled_store.read()
+        
+        # If no jobs, return empty list
+        if not jobs:
+            return []
+        
+        rows = []
+        for j in jobs:
+            try:
+                # Validate job structure
+                if not isinstance(j, dict) or 'run_at' not in j or 'job_id' not in j:
+                    logger.warning(f"Invalid job structure: {j}")
+                    continue
+                    
+                # Parse and format datetime
+                run_at_str = j["run_at"]
+                if isinstance(run_at_str, str):
+                    run_at = datetime.fromisoformat(run_at_str)
+                    formatted_time = fmt_local(run_at)
+                else:
+                    logger.warning(f"Invalid run_at format: {run_at_str}")
+                    formatted_time = "Неверное время"
+                
+                rows.append([
+                    InlineKeyboardButton(
+                        text=formatted_time,
+                        callback_data=f"job_detail:{j['job_id']}",
+                    )
+                ])
+            except Exception as e:
+                logger.error(f"Error processing job {j}: {e}")
+                continue
+        
+        return rows
+        
+    except Exception as e:
+        logger.error(f"Error in build_scheduled_rows: {e}")
+        return []
+
 
 
 # Замените функцию build_admin_rows (добавьте кнопку главного меню)
