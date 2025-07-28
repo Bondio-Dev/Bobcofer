@@ -1,3 +1,5 @@
 timestamp,phone,template_id,funnel,status,response_info
 2025-07-28 12:42:33,+79111363436,pywhatkit,job_4d86b3c4,SUCCESS,Отправлено
 2025-07-28 12:46:19,+79842739577,pywhatkit,job_4d86b3c4,SUCCESS,Отправлено
+2025-07-28 15:00:23,+79111363436,pywhatkit,job_18b367f7,SUCCESS,Отправлено
+2025-07-28 15:03:30,+79842739577,pywhatkit,job_18b367f7,SUCCESS,Отправлено
