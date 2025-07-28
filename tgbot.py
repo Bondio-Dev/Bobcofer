@@ -1949,6 +1949,48 @@ async def cb_to_main_menu(query: CallbackQuery, state: FSMContext):
         reply_markup=create_persistent_main_menu()
     )
 
+#--------------------------------------------
+
+async def restore_scheduled_jobs():
+    """Восстанавливает запланированные задачи при запуске бота"""
+    try:
+        jobs = scheduled_store.read()
+        current_time = now_tz()
+        
+        restored_count = 0
+        expired_count = 0
+        
+        for job in jobs[:]:  # Копия списка для безопасного изменения
+            try:
+                run_at = datetime.fromisoformat(job["run_at"])
+                
+                # Удаляем просроченные задачи
+                if run_at < current_time:
+                    scheduled_store.remove(lambda x: x["job_id"] == job["job_id"])
+                    expired_count += 1
+                    logger.info(f"Удалена просроченная задача: {job['job_id']}")
+                    continue
+                
+                # Восстанавливаем актуальные задачи
+                asyncio.create_task(
+                    job_queue.run_once(
+                        job_send_distribution, 
+                        run_at, 
+                        job, 
+                        job["job_id"]
+                    )
+                )
+                restored_count += 1
+                logger.info(f"Восстановлена задача: {job['job_id']} на {fmt_local(run_at)}")
+                
+            except Exception as e:
+                logger.error(f"Ошибка восстановления задачи {job.get('job_id', 'unknown')}: {e}")
+        
+        logger.info(f"Восстановлено задач: {restored_count}, удалено просроченных: {expired_count}")
+        
+    except Exception as e:
+        logger.exception(f"Ошибка при восстановлении задач: {e}")
+
 # ---------------------------------------------------------------------------
 async def main():
     ensure_dirs()
@@ -1987,8 +2029,11 @@ async def main():
     dp.include_router(router)
 
     asyncio.create_task(job_queue.process_jobs())
-    asyncio.create_task(warmup_amocrm()) # 👈 новый фон-таск
-
+    asyncio.create_task(warmup_amocrm())
+    
+    # ← ДОБАВИТЬ ЭТУ СТРОКУ
+    await restore_scheduled_jobs()
+    
     logger.info("🚀 Бот запущен.")
     await dp.start_polling(bot)
 
