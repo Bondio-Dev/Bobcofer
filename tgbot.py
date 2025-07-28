@@ -884,8 +884,13 @@ async def show_reports(message: Message, state: FSMContext):
         buttons = []
         for funnel, stats in sorted_funnels:
             text = stats['display_name']
-            callback = f"funnel_rep:{funnel}"
-            buttons.append([InlineKeyboardButton(text=text, callback_data=callback)])
+            callback_stats = f"funnel_rep:{funnel}"
+            callback_dl   = f"funnel_json:{funnel}"   # ⚠️ новое
+            buttons.append([
+                InlineKeyboardButton(text=text,  callback_data=callback_stats),
+                InlineKeyboardButton(text="📥", callback_data=callback_dl)   # «скачать»
+            ])
+
 
         buttons.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="rep_back")])
 
@@ -985,9 +990,14 @@ async def cb_funnel_report_detail(query: CallbackQuery, state: FSMContext):
 
         # Кнопки навигации
         buttons = [
-            [InlineKeyboardButton(text="⬅️ К списку отчетов", callback_data="back_to_reports")],
-            [InlineKeyboardButton(text="🏠 В главное меню", callback_data="rep_back")]
+            [InlineKeyboardButton(text="📥 Скачать JSON",
+                                callback_data=f"funnel_json:{funnel}")],
+            [InlineKeyboardButton(text="⬅️ К списку отчетов",
+                                callback_data="back_to_reports")],
+            [InlineKeyboardButton(text="🏠 В главное меню",
+                                callback_data="rep_back")]
         ]
+
 
         keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
         await query.message.edit_text(text, reply_markup=keyboard)
@@ -1011,6 +1021,50 @@ async def cb_back_to_reports(query: CallbackQuery, state: FSMContext):
     await show_reports(message_like, state)
 
 
+@router.callback_query(F.data.startswith("funnel_json:"))
+@admin_required
+async def cb_download_json(query: CallbackQuery, state: FSMContext):
+    await query.answer()   # убираем «крутилку Telegram»
+
+    funnel = query.data.split(":", 1)[1]
+    try:
+        df = pd.read_csv(LOG_FILE, parse_dates=['timestamp'])
+
+        # фильтруем
+        fil = df if funnel == "-" else df[df['funnel'] == funnel]
+        if fil.empty:
+            return await query.message.reply("❌ Данные для экспорта не найдены.")
+
+        # агрегаты
+        total = len(fil)
+        success = (fil['status'] == 'SUCCESS').sum()
+        failed = total - success
+
+        payload = {
+            "funnel": funnel,
+            "generated_at": datetime.now().isoformat(),
+            "summary": {
+                "total": int(total),
+                "success": int(success),
+                "failed": int(failed)
+            },
+            "messages": fil.to_dict(orient="records")
+        }
+
+        # сериализуем во временный файл
+        tmp = Path(TEMP_CONTACTS_DIR) / f"{funnel}_report_{uuid.uuid4().hex[:6]}.json"
+        tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), "utf-8")
+
+        # отправляем
+        await query.message.reply_document(
+            document=FSInputFile(path_or_bytesio=tmp, filename=tmp.name),
+            caption=f"Отчёт {funnel} в JSON-формате."
+        )
+
+        # 💡 (по желанию) удалить tmp через asyncio.create_task(...)
+    except Exception as e:
+        logger.exception("Ошибка экспорта отчёта: %s", e)
+        await query.message.reply("❌ Не удалось сформировать файл.")
 
 
 # 3) Колбэк "назад" из меню отчётов
