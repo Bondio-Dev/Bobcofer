@@ -1026,76 +1026,80 @@ from aiogram.types import FSInputFile
 @admin_required
 async def cb_download_json(query: CallbackQuery, state: FSMContext) -> None:
     """
-    Формирует JSON-файл по выбранной рассылке и отправляет его администратору.
-    Работает только из детальной карточки отчёта.
+    Отправляет компактный JSON-отчёт:
+    • агрегаты (успех/неудача, уникальные номера)
+    • период начала/конца
+    • список номеров + статус (SUCCESS / FAILED)
     """
-    await query.answer()  # закрываем «крутилку» Telegram
+    await query.answer()
 
     try:
-        funnel = query.data.split(":", 1)[1]
+        funnel_id = query.data.split(":", 1)[1]
 
-        # ────────────────────────────────────────────────────────────────────
-        # 1. Читаем лог отправок
+        # 1. Загружаем лог
         df = pd.read_csv(LOG_FILE, parse_dates=["timestamp"])
-        if df.empty:
-            return await query.message.reply("❌ Лог delivery_logs.csv пуст.")
+        df_f = df if funnel_id == "-" else df[df["funnel"] == funnel_id]
+        if df_f.empty:
+            return await query.message.reply("❌ Записей не найдено.")
 
-        # 2. Фильтруем по funnel («-» – ручная отправка без ID)
-        data_slice = df if funnel == "-" else df[df["funnel"] == funnel]
-        if data_slice.empty:
-            return await query.message.reply("❌ Записей для этого отчёта нет.")
+        # 2. Общие метки времени
+        start_ts = df_f["timestamp"].min()
+        end_ts   = df_f["timestamp"].max()
 
-        # ────────────────────────────────────────────────────────────────────
-        # 3. Сериализуем Timestamp в ISO-строку, иначе json.dumps упадёт
-        export_df = data_slice.copy()
-        export_df["timestamp"] = export_df["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:%S")
+        # 3. Итоговая статистика
+        total   = len(df_f)
+        success = (df_f["status"] == "SUCCESS").sum()
+        failed  = total - success
+        uniq    = df_f["phone"].nunique()
 
-        # 4. Считаем агрегаты
-        total = len(export_df)
-        success = (export_df["status"] == "SUCCESS").sum()
-        failed = total - success
+        # 4. Формируем сокращённую таблицу номеров
+        phones_json = (
+            df_f[["phone", "status"]]
+            .assign(phone=lambda x: "+" + x["phone"].astype(str))  # приводим к +79…
+            .to_dict(orient="records")
+        )
 
-        # 5. Собираем итоговый словарь
         payload = {
-            "funnel": funnel,
+            "funnel": funnel_id,
             "generated_at": datetime.now().isoformat(timespec="seconds"),
+            "period": {
+                "start": start_ts.strftime("%Y-%m-%dT%H:%M:%S"),
+                "end":   end_ts.strftime("%Y-%m-%dT%H:%M:%S")
+            },
             "summary": {
                 "total": int(total),
                 "success": int(success),
                 "failed": int(failed),
+                "unique_phones": int(uniq)
             },
-            "messages": export_df.to_dict(orient="records"),
+            "phones": phones_json
         }
 
-        # ────────────────────────────────────────────────────────────────────
-        # 6. Создаём временный файл в каталоге TEMP_CONTACTS_DIR
-        tmp_name = f"{funnel.replace('-', 'manual')}_report_{uuid.uuid4().hex[:6]}.json"
-        tmp_path = TEMP_CONTACTS_DIR / tmp_name
+        # 5. Записываем во временный файл
+        filename = f"{funnel_id or 'manual'}_short_{uuid.uuid4().hex[:6]}.json"
+        tmp_path = TEMP_CONTACTS_DIR / filename
         tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), "utf-8")
 
-        # 7. Отправляем файл как документ
-        # СТАЛО (рабочий вариант)
+        # 6. Отправляем
         await query.message.reply_document(
-            document=FSInputFile(tmp_path, filename=tmp_name),  # позиционный path
-            caption=f"📄 Отчёт для «{funnel}» в JSON-формате."
+            document=FSInputFile(tmp_path, filename=filename),
+            caption="📄JSON-отчёт"
         )
 
+        # 7. Удаляем через 10 мин
+        asyncio.create_task(_auto_cleanup(tmp_path))
 
-        # ────────────────────────────────────────────────────────────────────
-        # 8. Автоудаление через 10 минут, чтобы не накапливать мусор
-        async def _cleanup(path: Path, delay: int = 600) -> None:
-            await asyncio.sleep(delay)
-            try:
-                path.unlink(missing_ok=True)
-            except Exception as e:
-                logger.warning("Не удалось удалить временный файл %s: %s", path, e)
-
-        asyncio.create_task(_cleanup(tmp_path))
-
-    # ────────────────────────────────────────────────────────────────────────
     except Exception as e:
-        logger.exception("Ошибка экспорта отчёта: %s", e)
-        await query.message.reply("❌ Не удалось сформировать JSON-файл.")
+        logger.exception("Ошибка экспорта JSON: %s", e)
+        await query.message.reply("❌ Не удалось сформировать файл.")
+
+async def _auto_cleanup(path: Path, delay: int = 600):
+    await asyncio.sleep(delay)
+    try:
+        path.unlink(missing_ok=True)
+    except Exception:
+        logger.warning("Не смог удалить %s", path)
+
 
 
 
