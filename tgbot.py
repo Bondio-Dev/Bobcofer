@@ -707,7 +707,7 @@ async def job_send_distribution(context):
             # Формируем и отправляем
             message = template["content"].format(
                 name=contact["name"],
-                message=json.loads(MAIN_DATA.read_text())["2"]
+                message=json.loads(MAIN_DATA.read_text(encoding="utf-8"))["2"]
             )
             code, resp = await send_message_async(
                 dest=contact["phone"],
@@ -1644,10 +1644,17 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
     )
 
     # Отправляем финальное сообщение
+    # Отправляем финальное сообщение с кнопками главного меню
     await query.message.edit_text(
-        f"✅ Рассылка запланирована ({job_id}), время: {when}."
+        f"✅ Рассылка запланирована ({job_id}), время: {when}.",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="🏠 Главное меню", callback_data="to_main_menu")]
+            ]
+        )
     )
     await state.set_state(Form.STATE_MENU)
+
 
 
 
