@@ -40,7 +40,7 @@ sudo xhost +
 
 8) запуск:
 ```
-sudo screen -dmS bobcofer_bot bash -c "export DISPLAY=:10.0 && source ~/bot_env/bin/activate && python3 ~/Bobcofer/tgbot.py"
+screen -dmS bobcofer_bot bash -c "export DISPLAY=$DISPLAY && source ~/bot_env/bin/activate && python3 ~/Bobcofer/tgbot.py"
 ```
 
 проверка ```screen -ls```
