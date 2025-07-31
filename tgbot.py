@@ -41,6 +41,11 @@ import time
 from datetime import datetime, timedelta, timezone
 from itertools import islice
 from pathlib import Path
+import ssl
+import csv
+import uuid
+import os
+from aiogram.fsm.state import State, StatesGroup
 
 import aiohttp
 import phonenumbers
@@ -146,10 +151,47 @@ def send_message_sync(dest: str, message: str, funnel: str = "") -> tuple[int, s
         return 0, error_msg
 
 # ---------------------------------------------------------------------------
-# Асинхронная обертка для отправки
-async def send_message_async(dest: str, message: str, funnel: str = "") -> tuple[int, str]:
-    """Асинхронная обертка для send_message_sync"""
-    return await asyncio.to_thread(send_message_sync, dest, message, funnel)
+async def send_message_async(dest: str, message: str, funnel: str = "-") -> tuple[int, str]:
+    """Асинхронная отправка сообщения через Telegram Bot API"""
+    try:
+        token = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["BOT_TOKEN"]
+        import aiohttp
+        import ssl
+        
+        # Создаем SSL контекст который не проверяет сертификаты
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        
+        async with aiohttp.ClientSession(connector=connector) as session:
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            data = {
+                "chat_id": dest,
+                "text": message,
+                "parse_mode": "HTML"
+            }
+            
+            async with session.post(url, data=data) as response:
+                status_code = response.status
+                response_text = await response.text()
+                
+                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                phone_str = str(dest)
+                template_id = "text_template"
+                status = "SUCCESS" if status_code == 200 else "FAILED"
+                
+                with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([ts, phone_str, template_id, funnel, status, response_text[:100]])
+                
+                return status_code, response_text
+                
+    except Exception as e:
+        logger.exception(f"Ошибка отправки сообщения: {e}")
+        return 500, str(e)
+
 
 # ---------------------------------------------------------------------------
 # 5. Утилита чтения логов (bot.log + delivery_logs.txt)
@@ -261,6 +303,7 @@ class Form(StatesGroup):
     STATE_AMOCRM_FILENAME  = State()
     STATE_REPORT_LIST      = State()
     STATE_REPORT_DETAIL    = State()
+    STATE_PHOTO_UPLOAD = State()
 
 
 
@@ -306,13 +349,24 @@ class AmoCRMCategoryManager:
         return [(p["id"], p["name"]) for p in r.json()["_embedded"]["pipelines"]]
 
     def get_pipeline_statuses(self, pipeline_id: int) -> list[tuple[int, str]]:
+        """Получить статусы пайплайна с фильтрацией системных этапов"""
         r = requests.get(
-            f"{self.base_url}/leads/pipelines/{pipeline_id}",
+            f"{self.base_url}/leads/pipelines/{pipeline_id}/statuses",
             headers=self.headers,
-            timeout=20,
+            timeout=20
         )
         r.raise_for_status()
-        return [(s["id"], s["name"]) for s in r.json()["_embedded"]["statuses"]]
+        
+        # Системные этапы для исключения
+        system_stages = ['Неразобранное', 'Успешно реализовано', 'Закрыто и не реализовано']
+        
+        statuses = []
+        for status in r.json()["_embedded"]["statuses"]:
+            status_name = status["name"]
+            if status_name not in system_stages:
+                statuses.append((status["id"], status_name))
+        
+        return statuses
 
     def get_leads(self, pipeline_id: int, status_id: int) -> list[dict]:
         out, page = [], 1
@@ -692,28 +746,35 @@ async def job_send_distribution(context):
             logger.error("Шаблон %s не найден", job["template_id"])
             return
 
-        # Временной диапазон
         day_from = datetime.strptime(job.get("day_from", "00:00"), "%H:%M").time()
         day_until = datetime.strptime(job.get("day_until", "23:59"), "%H:%M").time()
+        photo_file_id = job.get("photo_file_id")
 
         for contact in contacts_data:
-            # Ждём начала допустимого диапазона
             while True:
                 now_local = (now_tz() + local_offset()).time()
                 if day_from <= now_local <= day_until:
                     break
                 await asyncio.sleep(60)
 
-            # Формируем и отправляем
             message = template["content"].format(
                 name=contact["name"],
                 message=json.loads(MAIN_DATA.read_text(encoding="utf-8"))["2"]
             )
-            code, resp = await send_message_async(
-                dest=contact["phone"],
-                message=message,
-                funnel=job["job_id"]
-            )
+            if photo_file_id:
+                code, resp = await send_message_with_photo_async(
+                    dest=contact["phone"],
+                    message=message,
+                    photo_file_id=photo_file_id,
+                    funnel=job["job_id"]
+                )
+            else:
+                code, resp = await send_message_async(
+                    dest=contact["phone"],
+                    message=message,
+                    funnel=job["job_id"]
+                )
+
             log_extra = {
                 "template": job["template_id"],
                 "funnel": job["job_id"],
@@ -723,8 +784,7 @@ async def job_send_distribution(context):
             }
             level = logging.INFO if code == 202 else logging.ERROR
             logger.log(level, "%s → %s", contact["phone"], "OK" if code == 202 else f"ERR {code}", extra=log_extra)
-
-            pause_seconds = random.randint(30, 300)
+            pause_seconds = random.randint(10, 15) #исправить
             logger.info(f"Пауза между отправками: {pause_seconds} секунд")
             await asyncio.sleep(pause_seconds)
 
@@ -734,15 +794,59 @@ async def job_send_distribution(context):
     except Exception:
         logger.exception("Ошибка в job_send_distribution")
 
+async def send_message_with_photo_async(dest: str, message: str, photo_file_id: str, funnel: str = "-") -> tuple[int, str]:
+    """Асинхронная отправка сообщения с фото через Telegram Bot API"""
+    try:
+        token = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["BOT_TOKEN"]
+        import aiohttp
+        import ssl
+        
+        # Создаем SSL контекст который не проверяет сертификаты
+        ssl_context = ssl.create_default_context()
+        ssl_context.check_hostname = False
+        ssl_context.verify_mode = ssl.CERT_NONE
+        
+        connector = aiohttp.TCPConnector(ssl=ssl_context)
+        
+        async with aiohttp.ClientSession(connector=connector) as session:
+            url = f"https://api.telegram.org/bot{token}/sendPhoto"
+            data = {
+                "chat_id": dest,
+                "photo": photo_file_id,
+                "caption": message,
+                "parse_mode": "HTML"
+            }
+            
+            async with session.post(url, data=data) as response:
+                status_code = response.status
+                response_text = await response.text()
+                
+                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                phone_str = str(dest)
+                template_id = "photo_template"
+                status = "SUCCESS" if status_code == 200 else "FAILED"
+                
+                with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([ts, phone_str, template_id, funnel, status, response_text[:100]])
+                
+                return status_code, response_text
+                
+    except Exception as e:
+        logger.exception(f"Ошибка отправки фото: {e}")
+        return 500, str(e)
+
+
 
 
 # 2.7) Расширение функции schedule_job для сохранения диапазона
 def schedule_job(run_at: datetime,
-                 contacts_file: Path,
-                 template_id: str,
-                 template_lang: str = "ru",
-                 day_from: str = "00:00",
-                 day_until: str = "23:59") -> str:
+                contacts_file: Path,
+                template_id: str,
+                template_lang: str = "ru",
+                day_from: str = "00:00",
+                day_until: str = "23:59",
+                photo_file_id: str = None) -> str:
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     data = {
         "job_id": job_id,
@@ -753,6 +857,9 @@ def schedule_job(run_at: datetime,
         "day_from": day_from,
         "day_until": day_until,
     }
+    if photo_file_id:
+        data["photo_file_id"] = photo_file_id
+
     scheduled_store.append(data)
     asyncio.create_task(
         job_queue.run_once(job_send_distribution, run_at, data, job_id)
@@ -1541,21 +1648,84 @@ async def cb_tpl_confirm(query: CallbackQuery, state: FSMContext):
         meta = json.loads(raw_meta) if isinstance(raw_meta, str) else raw_meta
     except json.JSONDecodeError:
         meta = {}
+
     example = meta.get("example", "")
 
-    # Сохраняем выбранный шаблон в state, чтобы потом не было KeyError
+    # Сохраняем выбранный шаблон в state
     await state.update_data(
-        chosen_tpl_id   = tpl.get("id") or tpl.get("templateId"),
+        chosen_tpl_id = tpl.get("id") or tpl.get("templateId"),
         chosen_tpl_lang = tpl.get("language") or tpl.get("lang") or "ru",
-        new_field2      = example
+        new_field2 = example
     )
 
-    # Пропускаем ввод поля 1 и сразу спрашиваем поле 2
+    # Спрашиваем про фото перед полем сообщения
     await query.message.edit_text(
-        f"✏️ Введите текст для поля {{message}}:"
+        "📸 Хотите добавить фото к рассылке?",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="📸 Добавить фото", callback_data="add_photo:yes")],
+                [InlineKeyboardButton(text="📝 Без фото", callback_data="add_photo:no")],
+            ]
+        ),
     )
-    await state.set_state(Form.STATE_TEMPLATE_NEW_2)
+    await state.set_state(Form.STATE_PHOTO_UPLOAD)
 
+@router.callback_query(F.data.startswith("add_photo:"))
+@admin_required
+async def cb_photo_choice(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+    
+    if query.data == "add_photo:no":
+        # Без фото — ввод текста
+        await query.message.edit_text("✏️ Введите текст для поля {message}:")
+        await state.set_state(Form.STATE_TEMPLATE_NEW_2)
+        return
+    
+    # С фото — просим загрузить
+    await query.message.edit_text("📸 Отправьте фото для рассылки:")
+    await state.update_data(photo_requested=True)
+    # Остаёмся в STATE_PHOTO_UPLOAD
+
+
+# 5. Обработка загруженного фото
+@router.message(Form.STATE_PHOTO_UPLOAD, F.photo)
+@admin_required
+async def handle_photo_upload(message: Message, state: FSMContext):
+    """Обработка загруженного фото"""
+    try:
+        photo = message.photo[-1]
+        await message.bot.get_file(photo.file_id)
+        await state.update_data(
+            photo_file_id=photo.file_id,
+            photo_file_unique_id=photo.file_unique_id
+        )
+        await message.reply("✅ Фото загружено! Теперь введите текст для поля {message}:")
+        await state.set_state(Form.STATE_TEMPLATE_NEW_2)
+    except Exception as e:
+        logger.exception(f"Ошибка при загрузке фото: {e}")
+        await message.reply(
+            "❌ Ошибка при загрузке фото. Попробуйте ещё раз или продолжите без фото.",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="📝 Продолжить без фото", callback_data="add_photo:no")]
+                ]
+            )
+        )
+
+
+# 6. Обработка не-фото в состоянии загрузки фото
+@router.message(Form.STATE_PHOTO_UPLOAD)
+@admin_required  
+async def handle_non_photo_in_photo_state(message: Message, state: FSMContext):
+    """Обработка не-фото сообщений в состоянии загрузки фото"""
+    await message.reply(
+        "📸 Пожалуйста, отправьте фото или выберите 'Продолжить без фото'",
+        reply_markup=InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text="📝 Продолжить без фото", callback_data="add_photo:no")]
+            ]
+        )
+    )
 
 
 @router.message(Form.STATE_TEMPLATE_NEW_1)
@@ -1579,29 +1749,41 @@ async def new_tpl_field1(message: Message, state: FSMContext):
 @router.message(Form.STATE_TEMPLATE_NEW_2)
 @admin_required
 async def new_tpl_field2(message: Message, state: FSMContext):
+    # Проверяем наличие текста
+    if not message.text:
+        await message.reply("❌ Пожалуйста, отправьте текстовое сообщение.")
+        return
+    
     text = message.text.strip()
+    
     # Используем новое состояние new_field2
     data = await state.get_data()
     field2 = data.get("new_field2", "")
+    
     if text:
-
         field2 = text
+    
     # Сохраняем единственное поле
     MAIN_DATA.write_text(
         json.dumps({"2": field2}, ensure_ascii=False, indent=2),
         encoding="utf-8"
     )
-    await message.reply(f"✅ Поле {"message"} установлено: «{field2}»")
+    
+    await message.reply(f"✅ Поле message установлено: «{field2}»")
+    
     # Дальше — выбор времени и подтверждение рассылки
     buttons = [
         [InlineKeyboardButton(text="⚡ Сразу отправить", callback_data="time:now")],
         [InlineKeyboardButton(text="⏰ Указать дату/время", callback_data="time:input")],
     ]
+    
     await message.reply(
         "⏰ Когда отправить рассылку?",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
+    
     await state.set_state(Form.STATE_TIME_CHOOSE)
+
 
 
 # ---------------------------------------------------------------------------
@@ -1663,18 +1845,35 @@ async def confirm_distribution(message: Message, state: FSMContext):
     preview = render_message_main()
     data = await state.get_data()
     run_at = datetime.fromisoformat(data["run_at"])
-    day_from  = data["day_from"]
+    day_from = data["day_from"]
     day_until = data["day_until"]
+    
+    # Информация о выбранном этапе
+    stage_info = ""
+    contacts_file = data.get("contacts", "")
+    if contacts_file:
+        file_name = Path(contacts_file).stem
+        if "all_contacts" not in file_name:
+            snap_path = AMOCRM_DIR / "funnels.json"
+            if snap_path.exists():
+                try:
+                    snap = json.loads(snap_path.read_text("utf-8"))
+                    for funnel in snap["funnels"]:
+                        if file_name in funnel["file"]:
+                            stage_info = f"\n📊 Этап: {funnel['name']}"
+                            break
+                except Exception:
+                    pass
 
     when = "сейчас" if run_at < now_tz() + timedelta(seconds=30) else fmt_local(run_at)
     await message.reply(
         f"📄 Сообщение: Здравствуйте [name]! {preview}\n"
         f"⏰ Старт: {when}\n"
-        f"🌗 Диапазон: {day_from} – {day_until}",
+        f"🌗 Диапазон: {day_from} – {day_until}{stage_info}",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text='✅ Подтвердить', callback_data='confirm:yes')],
-                [InlineKeyboardButton(text='❌ Отмена',      callback_data='confirm:no')],
+                [InlineKeyboardButton(text='❌ Отмена', callback_data='confirm:no')],
             ]
         ),
     )
@@ -1723,7 +1922,8 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
         template_id,
         template_lang,
         day_from=day_from,
-        day_until=day_until
+        day_until=day_until,
+        photo_file_id=data.get("photo_file_id")
     )
 
     # Форматируем время для пользователя
