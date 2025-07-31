@@ -152,41 +152,41 @@ def send_message_sync(dest: str, message: str, funnel: str = "") -> tuple[int, s
 
 # ---------------------------------------------------------------------------
 async def send_message_async(dest: str, message: str, funnel: str = "-") -> tuple[int, str]:
-    """Асинхронная отправка сообщения через Telegram Bot API"""
+    """Асинхронная отправка сообщения через WhatsApp (используем синхронный PyWhatKit)"""
     try:
-        token = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["BOT_TOKEN"]
-        import aiohttp
-        import ssl
-        
-        # Создаем SSL контекст который не проверяет сертификаты
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        
-        async with aiohttp.ClientSession(connector=connector) as session:
-            url = f"https://api.telegram.org/bot{token}/sendMessage"
-            data = {
-                "chat_id": dest,
-                "text": message,
-                "parse_mode": "HTML"
-            }
+        # Форматируем номер телефона
+        if not dest.startswith('+'):
+            dest = '+' + dest
             
-            async with session.post(url, data=data) as response:
-                status_code = response.status
-                response_text = await response.text()
-                
-                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                phone_str = str(dest)
-                template_id = "text_template"
-                status = "SUCCESS" if status_code == 200 else "FAILED"
-                
-                with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([ts, phone_str, template_id, funnel, status, response_text[:100]])
-                
-                return status_code, response_text
+        # Отправляем сообщение через WhatsApp
+        import pywhatkit
+        pywhatkit.sendwhatmsg_instantly(
+            phone_no=dest,
+            message=message,
+            wait_time=get_random_wait_time(),
+            tab_close=True
+        )
+        
+        # Логируем успех
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([ts, str(dest), "text_whatsapp", funnel, "SUCCESS", "Отправлено через WhatsApp"])
+        
+        return 202, "Сообщение отправлено через WhatsApp"
+        
+    except Exception as e:
+        error_msg = f"Ошибка отправки через WhatsApp: {e}"
+        logger.exception(error_msg)
+        
+        # Логируем ошибку
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([ts, str(dest), "text_whatsapp", funnel, "FAILED", error_msg[:100]])
+        
+        return 500, error_msg
+
                 
     except Exception as e:
         logger.exception(f"Ошибка отправки сообщения: {e}")
@@ -795,46 +795,72 @@ async def job_send_distribution(context):
         logger.exception("Ошибка в job_send_distribution")
 
 async def send_message_with_photo_async(dest: str, message: str, photo_file_id: str, funnel: str = "-") -> tuple[int, str]:
-    """Асинхронная отправка сообщения с фото через Telegram Bot API"""
+    """Асинхронная отправка сообщения с фото через WhatsApp (синхронный PyWhatKit)"""
     try:
+        # Форматируем номер телефона
+        if not dest.startswith('+'):
+            dest = '+' + dest
+        
+        # Получаем путь к фото из Telegram
         token = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["BOT_TOKEN"]
+        
+        # Скачиваем фото
         import aiohttp
-        import ssl
+        import tempfile
+        import os
         
-        # Создаем SSL контекст который не проверяет сертификаты
-        ssl_context = ssl.create_default_context()
-        ssl_context.check_hostname = False
-        ssl_context.verify_mode = ssl.CERT_NONE
-        
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-        
-        async with aiohttp.ClientSession(connector=connector) as session:
-            url = f"https://api.telegram.org/bot{token}/sendPhoto"
-            data = {
-                "chat_id": dest,
-                "photo": photo_file_id,
-                "caption": message,
-                "parse_mode": "HTML"
-            }
+        async with aiohttp.ClientSession() as session:
+            # Получаем информацию о файле
+            file_url = f"https://api.telegram.org/bot{token}/getFile?file_id={photo_file_id}"
+            async with session.get(file_url) as response:
+                if response.status != 200:
+                    raise Exception("Не удалось получить информацию о файле")
+                file_info = await response.json()
+                file_path = file_info['result']['file_path']
             
-            async with session.post(url, data=data) as response:
-                status_code = response.status
-                response_text = await response.text()
+            # Скачиваем файл
+            download_url = f"https://api.telegram.org/file/bot{token}/{file_path}"
+            async with session.get(download_url) as response:
+                if response.status != 200:
+                    raise Exception("Не удалось скачать файл")
                 
-                ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                phone_str = str(dest)
-                template_id = "photo_template"
-                status = "SUCCESS" if status_code == 200 else "FAILED"
-                
-                with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
-                    writer = csv.writer(f)
-                    writer.writerow([ts, phone_str, template_id, funnel, status, response_text[:100]])
-                
-                return status_code, response_text
-                
+                # Сохраняем во временный файл
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                    temp_file.write(await response.read())
+                    temp_file_path = temp_file.name
+        
+        # Отправляем через WhatsApp
+        import pywhatkit
+        pywhatkit.sendwhats_image(
+            receiver=dest,
+            img_path=temp_file_path,
+            caption=message,
+            wait_time=get_random_wait_time(),
+            tab_close=True
+        )
+        
+        # Удаляем временный файл
+        os.unlink(temp_file_path)
+        
+        # Логируем успех
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([ts, str(dest), "photo_whatsapp", funnel, "SUCCESS", "Отправлено через WhatsApp"])
+        
+        return 202, "Фото отправлено через WhatsApp"
+        
     except Exception as e:
-        logger.exception(f"Ошибка отправки фото: {e}")
-        return 500, str(e)
+        error_msg = f"Ошибка отправки фото через WhatsApp: {e}"
+        logger.exception(error_msg)
+        
+        # Логируем ошибку
+        ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([ts, str(dest), "photo_whatsapp", funnel, "FAILED", error_msg[:100]])
+        
+        return 500, error_msg
 
 
 

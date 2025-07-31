@@ -7,3 +7,7 @@ timestamp,phone,template_id,funnel,status,response_info
 2025-07-31 18:45:29,+79111363436,photo_template,job_f091e645,FAILED,"{""ok"":false,""error_code"":400,""description"":""Bad Request: chat not found""}"
 2025-07-31 18:50:55,+79111363436,text_template,job_1ce8e942,FAILED,"{""ok"":false,""error_code"":400,""description"":""Bad Request: chat not found""}"
 2025-07-31 18:51:05,+79842739577,text_template,job_1ce8e942,FAILED,"{""ok"":false,""error_code"":400,""description"":""Bad Request: chat not found""}"
+2025-07-31 19:10:54,+79111363436,text_whatsapp,job_a70b0a0c,SUCCESS,Отправлено через WhatsApp
+2025-07-31 19:11:27,+79842739577,text_whatsapp,job_a70b0a0c,SUCCESS,Отправлено через WhatsApp
+2025-07-31 19:16:03,+79111363436,photo_whatsapp,job_8d71acf0,FAILED,Ошибка отправки фото через WhatsApp: Cannot connect to host api.telegram.org:443 ssl:True [SSLCertVe
+2025-07-31 19:16:15,+79842739577,photo_whatsapp,job_8d71acf0,FAILED,Ошибка отправки фото через WhatsApp: Cannot connect to host api.telegram.org:443 ssl:True [SSLCertVe
