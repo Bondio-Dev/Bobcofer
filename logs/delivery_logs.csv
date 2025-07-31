@@ -11,3 +11,10 @@ timestamp,phone,template_id,funnel,status,response_info
 2025-07-31 19:11:27,+79842739577,text_whatsapp,job_a70b0a0c,SUCCESS,Отправлено через WhatsApp
 2025-07-31 19:16:03,+79111363436,photo_whatsapp,job_8d71acf0,FAILED,Ошибка отправки фото через WhatsApp: Cannot connect to host api.telegram.org:443 ssl:True [SSLCertVe
 2025-07-31 19:16:15,+79842739577,photo_whatsapp,job_8d71acf0,FAILED,Ошибка отправки фото через WhatsApp: Cannot connect to host api.telegram.org:443 ssl:True [SSLCertVe
+2025-07-31 20:03:36,+79111363436,photo_whatsapp,job_ea405a43,FAILED,Ошибка отправки фото: Cannot connect to host api.telegram.org:443 ssl:True [SSLCertVerificationError
+2025-07-31 20:03:46,+79842739577,photo_whatsapp,job_ea405a43,FAILED,Ошибка отправки фото: Cannot connect to host api.telegram.org:443 ssl:True [SSLCertVerificationError
+2025-07-31 20:37:06,+79111363436,photo_whatsapp,job_54b1b9a1,FAILED,Ошибка отправки фото: No module named 'win32clipboard'
+2025-07-31 20:38:01,+79842739577,photo_whatsapp,job_54b1b9a1,FAILED,Ошибка отправки фото: No module named 'win32clipboard'
+2025-07-31 20:50:10,+79111363436,photo_whatsapp,job_53f33ffc,SUCCESS,Фото отправлено
+2025-07-31 20:59:23,+79111363436,photo_whatsapp,job_37d02314,SUCCESS,Фото отправлено
+2025-07-31 21:00:33,+79842739577,photo_whatsapp,job_37d02314,SUCCESS,Фото отправлено

@@ -68,3 +68,21 @@ Time: 19:11
 Phone Number: +79842739577
 Message: Здравствуйте, test_2! 1
 --------------------
+Date: 31/7/2025
+Time: 20:48
+Phone Number: +79111363436
+Image: C:\Users\mrmin\AppData\Local\Temp\whatsapp_image_1753984126.jpg
+Caption: Здравствуйте, bondio_test2! 123
+--------------------
+Date: 31/7/2025
+Time: 20:58
+Phone Number: +79111363436
+Image: C:\Users\mrmin\AppData\Local\Temp\whatsapp_image_1753984691.jpg
+Caption: Здравствуйте, bondio_test2! 1
+--------------------
+Date: 31/7/2025
+Time: 20:59
+Phone Number: +79842739577
+Image: C:\Users\mrmin\AppData\Local\Temp\whatsapp_image_1753984775.jpg
+Caption: Здравствуйте, test_2! 1
+--------------------

@@ -795,21 +795,26 @@ async def job_send_distribution(context):
         logger.exception("Ошибка в job_send_distribution")
 
 async def send_message_with_photo_async(dest: str, message: str, photo_file_id: str, funnel: str = "-") -> tuple[int, str]:
-    """Асинхронная отправка сообщения с фото через WhatsApp (синхронный PyWhatKit)"""
+    """Исправленная отправка сообщения с фото через WhatsApp"""
     try:
         # Форматируем номер телефона
         if not dest.startswith('+'):
             dest = '+' + dest
         
-        # Получаем путь к фото из Telegram
+        # Получаем токен
         token = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))["BOT_TOKEN"]
         
-        # Скачиваем фото
+        # Скачиваем фото с отключенной SSL проверкой
         import aiohttp
         import tempfile
         import os
+        import time
+        import pyautogui
         
-        async with aiohttp.ClientSession() as session:
+        # Создаем коннектор с отключенной SSL проверкой
+        connector = aiohttp.TCPConnector(ssl=False)
+        
+        async with aiohttp.ClientSession(connector=connector) as session:
             # Получаем информацию о файле
             file_url = f"https://api.telegram.org/bot{token}/getFile?file_id={photo_file_id}"
             async with session.get(file_url) as response:
@@ -824,45 +829,65 @@ async def send_message_with_photo_async(dest: str, message: str, photo_file_id: 
                 if response.status != 200:
                     raise Exception("Не удалось скачать файл")
                 
-                # Сохраняем во временный файл
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
+                # Создаем временный файл с абсолютным путем
+                temp_dir = os.path.abspath(tempfile.gettempdir())
+                temp_filename = f"whatsapp_image_{int(time.time())}.jpg"
+                temp_file_path = os.path.join(temp_dir, temp_filename)
+                
+                with open(temp_file_path, 'wb') as temp_file:
                     temp_file.write(await response.read())
-                    temp_file_path = temp_file.name
         
         # Отправляем через WhatsApp
         import pywhatkit
-        pywhatkit.sendwhats_image(
-            receiver=dest,
-            img_path=temp_file_path,
-            caption=message,
-            wait_time=get_random_wait_time(),
-            tab_close=True
-        )
         
-        # Удаляем временный файл
-        os.unlink(temp_file_path)
+        # Увеличиваем время ожидания
+        wait_time = max(get_random_wait_time(), 25)
+        
+        try:
+            pywhatkit.sendwhats_image(
+                receiver=dest,
+                img_path=temp_file_path,
+                caption=message,
+                wait_time=wait_time,
+                tab_close=False
+            )
+            
+            # Ждем загрузки
+            await asyncio.sleep(wait_time + 3)
+            
+            # Дополнительная автоматизация
+            screen_width, screen_height = pyautogui.size()
+            pyautogui.click(screen_width // 2, screen_height // 2)
+            await asyncio.sleep(1)
+            pyautogui.press('enter')
+            await asyncio.sleep(2)
+            pyautogui.hotkey('ctrl', 'w')
+            
+        finally:
+            # Удаляем временный файл
+            try:
+                os.unlink(temp_file_path)
+            except:
+                pass
         
         # Логируем успех
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow([ts, str(dest), "photo_whatsapp", funnel, "SUCCESS", "Отправлено через WhatsApp"])
+            writer.writerow([ts, str(dest), "photo_whatsapp", funnel, "SUCCESS", "Фото отправлено"])
         
         return 202, "Фото отправлено через WhatsApp"
         
     except Exception as e:
-        error_msg = f"Ошибка отправки фото через WhatsApp: {e}"
+        error_msg = f"Ошибка отправки фото: {e}"
         logger.exception(error_msg)
         
-        # Логируем ошибку
         ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         with open('logs/delivery_logs.csv', mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow([ts, str(dest), "photo_whatsapp", funnel, "FAILED", error_msg[:100]])
         
         return 500, error_msg
-
-
 
 
 # 2.7) Расширение функции schedule_job для сохранения диапазона
