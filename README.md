@@ -12,7 +12,7 @@
 python3 -m venv bot_env
 
 # Активировать его (для bash/zsh)
-source bot_env/binactivate
+source bot_env/bin/activate
 
 # Установить зависимости из файла requirements.txt
 pip install -r requirements.txt
