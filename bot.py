@@ -895,9 +895,10 @@ def schedule_job(run_at: datetime,
                 contacts_file: Path,
                 template_id: str,
                 template_lang: str = "ru",
-                day_from: str = "00:00",
-                day_until: str = "23:59",
+                day_from: str = "10:00",
+                day_until: str = "22:00",
                 photo_file_id: str = None) -> str:
+
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     data = {
         "job_id": job_id,
@@ -1001,6 +1002,13 @@ async def handle_menu(message: Message, state: FSMContext):
     # Если попали сюда - неизвестная команда
     await message.reply("❓ Команда не распознана, выберите опцию из меню.")
 
+
+@router.callback_query(F.data == "time:input")
+@admin_required
+async def cb_time_input(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+    await query.message.edit_text("✏️ Пожалуйста, введите дату и время в формате ДД.ММ.ГГГГ ЧЧ:ММ")
+    await state.set_state(Form.STATE_TIME_INPUT)
 
 
 # ---------------------------------------------------------------------------
@@ -1289,17 +1297,23 @@ async def ask_audience(
         [InlineKeyboardButton(text="👥 Все воронки", callback_data="aud:all")]
     ]
 
+    # Системные этапы для исключения
+    system_stages = ['Неразобранное', 'Успешно реализовано', 'Закрыто и не реализовано']
+
     funnel_map = {}
     for idx, item in enumerate(snap["funnels"]):
-        fid = f"f{idx}"
-        funnel_map[fid] = item["file"]
-        buttons.append(
-            [
-                InlineKeyboardButton(
-                    text=f"📂 {item['name']}", callback_data=f"aud:{fid}"
-                )
-            ]
-        )
+        # Фильтруем системные воронки
+        if item['name'] not in system_stages:
+            fid = f"f{idx}"
+            funnel_map[fid] = item["file"]
+            buttons.append(
+                [
+                    InlineKeyboardButton(
+                        text=f"📂 {item['name']}", callback_data=f"aud:{fid}"
+                    )
+                ]
+            )
+
 
     text = (
         f"{update_result}\n\n" if update_result else ""
@@ -1843,20 +1857,13 @@ async def new_tpl_field2(message: Message, state: FSMContext):
 async def cb_time_choose(query: CallbackQuery, state: FSMContext):
     await query.answer()
     if query.data.endswith("now"):
-        # Сразу – сохраняем run_at и дефолтный диапазон
+        # Сразу – сохраняем run_at и фиксированный диапазон 10:00-22:00
         await state.update_data(
             run_at=now_tz().isoformat(),
-            day_from="00:00",
-            day_until="23:59"
+            day_from="10:00",
+            day_until="22:00"
         )
         return await confirm_distribution(query.message, state)
-
-    # Если выбрано указать дату/время
-    await query.message.reply(
-        "📅 Введите дату и время в формате DD.MM.YYYY HH:MM",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    await state.set_state(Form.STATE_TIME_INPUT)
 
 
 
@@ -1866,9 +1873,15 @@ async def time_input(message: Message, state: FSMContext):
     dt = parse_datetime(message.text)
     if not dt or dt < now_tz():
         return await message.reply("❌ Некорректная или прошедшая дата, попробуйте снова.")
-    await state.update_data(run_at=dt.isoformat())
-    # Переходим к вводу диапазона
-    await ask_time_range(message, state)
+    # Устанавливаем время и фиксированный диапазон 10:00-22:00
+    await state.update_data(
+        run_at=dt.isoformat(),
+        day_from="10:00",
+        day_until="22:00"
+    )
+    # Сразу переходим к подтверждению
+    await confirm_distribution(message, state)
+
 
 
 async def ask_time_range(where: Message, state: FSMContext):

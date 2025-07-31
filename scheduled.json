@@ -1,1 +1,11 @@
-[]
+[
+  {
+    "job_id": "job_42b1731a",
+    "run_at": "2025-07-31T23:34:00.000004+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_4de7295a.json",
+    "template_id": "greeting",
+    "template_lang": "ru",
+    "day_from": "10:00",
+    "day_until": "22:00"
+  }
+]
