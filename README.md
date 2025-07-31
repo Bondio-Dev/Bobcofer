@@ -30,16 +30,18 @@ sudo cp /var/run/lightdm/root/:0 ~/.Xauthority
 
 sudo chown $USER:$USER ~/.Xauthority
 
-export DISPLAY=:0
+export DISPLAY=:10.0
 
 export XAUTHORITY=$HOME/.Xauthority
 
-xhost +local:$USER
 sudo xhost +
 ```
 7) Установка screen: ```sudo apt install screen```
 
-8) запуск:  ```sudo screen -dmS bobcofer_bot python3 ~/Bobcofer/tgbot.py```
+8) запуск:
+```
+screen -dmS bobcofer_bot bash -c "export DISPLAY=$DISPLAY && export XAUTHORITY=$HOME/.Xauthority && source ~/bot_env/bin/activate && python3 ~/Bobcofer/tgbot.py"
+```
 
 проверка ```screen -ls```
 
