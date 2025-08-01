@@ -2063,10 +2063,19 @@ async def cb_to_main_menu(query: CallbackQuery, state: FSMContext):
     await query.answer()
     await state.clear()
     await state.set_state(Form.STATE_MENU)
-    await query.message.edit_text(
+    
+    # Удаляем исходное сообщение с inline-кнопками
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    
+    # Отправляем новое сообщение с ReplyKeyboard
+    await query.message.answer(
         "🏠 Главное меню:",
         reply_markup=create_persistent_main_menu()
     )
+
 
 #--------------------------------------------
 
