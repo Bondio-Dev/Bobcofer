@@ -260,7 +260,7 @@ def load_reports():
     return stats
 
 MENU_BUTTONS = [
-    ["Выбрать воронку"],
+    ["Выбрать этап"],
     ["Просмотр шаблонов"],
     ["Просмотр запланированных"],
     ["Просмотр админов"],
@@ -395,7 +395,7 @@ class AmoCRMCategoryManager:
         return out
 
     def get_leads_all_statuses(self, pipeline_id: int) -> list[dict]:
-        """Возвращает все сделки во всех статусах указанной воронки."""
+        """Возвращает все сделки во всех статусах указанного этапа."""
         all_leads = []
         for status_id, _ in self.get_pipeline_statuses(pipeline_id):
             all_leads.extend(self.get_leads(pipeline_id, status_id))
@@ -455,7 +455,7 @@ from main import build_funnels_snapshot
 
 
 # ---------------------------------------------------------------------------
-# Обновляем список воронок: чистим папку и пишем funnels.json
+# Обновляем список этапов: чистим папку и пишем funnels.json
 async def update_amocrm_funnels() -> str:
     attempt = 0
     max_attempts = 3
@@ -485,7 +485,7 @@ async def update_amocrm_funnels() -> str:
                 return "❌ Сервер AmoCRM не отвечает, попробуйте снова через несколько минут"
     
     # Этот код никогда не должен выполниться, но на всякий случай
-    return "❌ Неожиданная ошибка при обновлении воронок"
+    return "❌ Неожиданная ошибка при обновлении этапов"
 
 
 class JSONStore:
@@ -651,7 +651,7 @@ def build_scheduled_rows():
                     logger.warning(f"Invalid run_at format: {run_at_str}")
                     formatted_time = "Неверное время"
 
-                # ДОБАВЛЕНО: добавляем название воронки в кнопку
+                # ДОБАВЛЕНО: добавляем название этапы в кнопку
                 funnel_name = j.get("funnel_name", "")
                 if funnel_name:
                     button_text = f"{formatted_time} ({funnel_name})"
@@ -915,7 +915,7 @@ def schedule_job(run_at: datetime,
         "template_lang": template_lang,
         "day_from": day_from,
         "day_until": day_until,
-        "funnel_name": funnel_name,  # ДОБАВЛЕНО: сохраняем название воронки
+        "funnel_name": funnel_name,  # ДОБАВЛЕНО: сохраняем название этапы
     }
     if photo_file_id:
         data["photo_file_id"] = photo_file_id
@@ -967,8 +967,8 @@ async def handle_menu(message: Message, state: FSMContext):
     
     text = message.text
     
-    if text == "Выбрать воронку":
-        await message.answer("🔄 Обновляем воронки…")
+    if text == "Выбрать этап":
+        await message.answer("🔄 Обновляем этапы…")
         result = await update_amocrm_funnels()
         await ask_audience(message, state, result)
         return
@@ -1303,7 +1303,7 @@ async def ask_audience(
 
     snap = json.loads(snap_path.read_text("utf-8"))
     buttons = [
-        [InlineKeyboardButton(text="👥 Все воронки", callback_data="aud:all")]
+        [InlineKeyboardButton(text="👥 Все этапы", callback_data="aud:all")]
     ]
 
     # Системные этапы для исключения
@@ -1311,7 +1311,7 @@ async def ask_audience(
 
     funnel_map = {}
     for idx, item in enumerate(snap["funnels"]):
-        # Фильтруем системные воронки
+        # Фильтруем системные этапы
         if item['name'] not in system_stages:
             fid = f"f{idx}"
             funnel_map[fid] = item["file"]
@@ -1490,7 +1490,7 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             except Exception as e:
                 logger.warning("Не удалось удалить старый файл %s: %s", f, e)
 
-    # Если "Все воронки"
+    # Если "Все этапы"
     if query.data == "aud:all":
         contacts = []
         for file in AMOCRM_DIR.glob("*.json"):
@@ -1533,9 +1533,9 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
         )
         return
 
-    # Если конкретная воронка
+    # Если конкретная этап
     if query.data.startswith("aud:f"):
-        print("DEBUG: Выбрана конкретная воронка")
+        print("DEBUG: Выбран конкретный этап")
         data_state = await state.get_data()
         funnel_map = data_state.get("funnel_map", {})
         fid = query.data.split(":", 1)[1]
@@ -1605,15 +1605,14 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
         tmp = TEMP_CONTACTS_DIR / f"{Path(file_name).stem}_{uuid.uuid4().hex[:8]}.json"
         tmp.write_text(json.dumps(contacts, ensure_ascii=False), "utf-8")
         
-        print(f"DEBUG: Saving contacts file: {tmp}")
-        print(f"DEBUG: Contacts count: {len(contacts)}")
+
         
         await state.update_data(contacts=str(tmp))
-        print("UPDATE: contacts записан в state для конкретной воронки!")
+
         
         # Проверим что сохранилось
         test_data = await state.get_data()
-        print(f"DEBUG: After saving, state contains contacts: {test_data.get('contacts', 'NOT_FOUND')}")
+
 
         cnt = len(contacts)
         min_secs = 40 * cnt
@@ -1636,7 +1635,7 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
         return
 
 
-    # Если конкретная воронка
+    # Если конкретная этап
     if query.data.startswith("aud:f"):
         data_state = await state.get_data()
         funnel_map = data_state.get("funnel_map", {})
@@ -2059,7 +2058,7 @@ async def confirm_distribution(message: Message, state: FSMContext):
     
     if not contacts_file:
         print("DEBUG: ОШИБКА! contacts_file пустое!")
-        await message.reply("❌ ОШИБКА: Файл контактов не найден. Попробуйте выбрать воронку заново.")
+        await message.reply("❌ ОШИБКА: Файл контактов не найден. Попробуйте выбрать этап заново.")
         return
     
     if contacts_file:
@@ -2067,8 +2066,8 @@ async def confirm_distribution(message: Message, state: FSMContext):
         print(f"DEBUG: file_name = {file_name}")
         
         if "all_contacts" in file_name:
-            funnel_name = "Все воронки"
-            stage_info = "\n📊 Этап: Все воронки"
+            funnel_name = "Все этапы"
+            stage_info = "\n📊 Этап: Все этапы"
             print(f"DEBUG: Detected all_contacts, funnel_name = {funnel_name}")
         else:
             snap_path = AMOCRM_DIR / "funnels.json"
@@ -2098,7 +2097,7 @@ async def confirm_distribution(message: Message, state: FSMContext):
     
     print(f"DEBUG: Final funnel_name = '{funnel_name}'")
     
-    # Сохраняем название воронки в state
+    # Сохраняем название этапы в state
     await state.update_data(funnel_name=funnel_name)
 
     when = "сейчас" if run_at < now_tz() + timedelta(seconds=30) else fmt_local(run_at)
@@ -2157,7 +2156,7 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
 
     run_at = datetime.fromisoformat(run_at_iso)
 
-    # Планируем задачу с учётом диапазона и воронки
+    # Планируем задачу с учётом диапазона и этапы
     job_id = schedule_job(
         run_at,
         contacts_file,
@@ -2176,8 +2175,8 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
         else fmt_local(run_at)
     )
 
-    # Добавляем информацию о воронке в сообщение подтверждения
-    funnel_info = f" для воронки '{funnel_name}'" if funnel_name else ""
+    # Добавляем информацию о этапе в сообщение подтверждения
+    funnel_info = f" для этапы '{funnel_name}'" if funnel_name else ""
 
     
     await query.message.edit_text(
@@ -2206,8 +2205,8 @@ async def cb_aud_all_yes(query: CallbackQuery, state: FSMContext):
     test_data = await state.get_data()
 
     
-    # Устанавливаем funnel_name для всех воронок
-    await state.update_data(funnel_name="Все воронки")
+    # Устанавливаем funnel_name для всех этапов
+    await state.update_data(funnel_name="Все этапы")
     
     # Проверим что сохранилось
     test_data2 = await state.get_data()
@@ -2218,7 +2217,7 @@ async def cb_aud_all_yes(query: CallbackQuery, state: FSMContext):
 
 
 # ---------------------------------------------------------------------------
-# 3) Подтверждение рассылки по всем воронкам после выбора "Да"
+# 3) Подтверждение рассылки по всем этапм после выбора "Да"
 @router.callback_query(F.data.startswith("aud_all:"))
 @admin_required
 async def cb_aud_all_confirm(query: CallbackQuery, state: FSMContext):
@@ -2253,9 +2252,9 @@ async def cb_job_detail(query: CallbackQuery, state: FSMContext):
     except Exception:
         contacts_count = "неизвестно"
 
-    # ДОБАВЛЕНО: получаем информацию о воронке
+    # ДОБАВЛЕНО: получаем информацию о этапе
     funnel_name = job.get("funnel_name", "")
-    funnel_info = f"\n📊 Воронка: {funnel_name}" if funnel_name else ""
+    funnel_info = f"\n📊 этап: {funnel_name}" if funnel_name else ""
     
     buttons = [
         [
@@ -2266,7 +2265,7 @@ async def cb_job_detail(query: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="❌ Отмена", callback_data="job_cancel")],
     ]
 
-    # УЛУЧШЕНО: добавляем информацию о воронке в детали задачи
+    # УЛУЧШЕНО: добавляем информацию о этапе в детали задачи
     await query.message.edit_text(
         f"📅 Запланированная рассылка:\n"
         f"🕒 Время: {when}\n"
