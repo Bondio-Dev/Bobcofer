@@ -472,7 +472,7 @@ async def update_amocrm_funnels() -> str:
     while attempt < max_attempts:
         try:
             snap = await asyncio.to_thread(build_funnels_snapshot)
-            return f"✅ Снято {len(snap['funnels'])} воронок, контакты очищены."
+            return f"✅ Найденно {len(snap['funnels'])} этапов, данные успешно синхронизированы с amo crm."
         except Exception as e:
             attempt += 1
             logger.exception(f"build_funnels_snapshot попытка {attempt}/{max_attempts} неудачна: %s", e)
@@ -630,11 +630,10 @@ def build_scheduled_rows():
     """Build inline keyboard rows for scheduled jobs with error handling"""
     try:
         jobs = scheduled_store.read()
-        
         # If no jobs, return empty list
         if not jobs:
             return []
-        
+
         rows = []
         for j in jobs:
             try:
@@ -642,7 +641,7 @@ def build_scheduled_rows():
                 if not isinstance(j, dict) or 'run_at' not in j or 'job_id' not in j:
                     logger.warning(f"Invalid job structure: {j}")
                     continue
-                    
+
                 # Parse and format datetime
                 run_at_str = j["run_at"]
                 if isinstance(run_at_str, str):
@@ -651,22 +650,29 @@ def build_scheduled_rows():
                 else:
                     logger.warning(f"Invalid run_at format: {run_at_str}")
                     formatted_time = "Неверное время"
-                
+
+                # ДОБАВЛЕНО: добавляем название воронки в кнопку
+                funnel_name = j.get("funnel_name", "")
+                if funnel_name:
+                    button_text = f"{formatted_time} ({funnel_name})"
+                else:
+                    button_text = formatted_time
+
                 rows.append([
                     InlineKeyboardButton(
-                        text=formatted_time,
+                        text=button_text,
                         callback_data=f"job_detail:{j['job_id']}",
                     )
                 ])
             except Exception as e:
                 logger.error(f"Error processing job {j}: {e}")
                 continue
-        
+
         return rows
-        
     except Exception as e:
         logger.error(f"Error in build_scheduled_rows: {e}")
         return []
+
 
 
 
@@ -894,11 +900,12 @@ async def send_message_with_photo_async(dest: str, message: str, photo_file_id: 
 def schedule_job(run_at: datetime,
                 contacts_file: Path,
                 template_id: str,
-                template_lang: str = "ru",
+                template_lang: str = "ru", 
                 day_from: str = "10:00",
                 day_until: str = "22:00",
-                photo_file_id: str = None) -> str:
-
+                photo_file_id: str = None,
+                funnel_name: str = "") -> str:  # ДОБАВЛЕНО: параметр funnel_name
+    
     job_id = f"job_{uuid.uuid4().hex[:8]}"
     data = {
         "job_id": job_id,
@@ -908,6 +915,7 @@ def schedule_job(run_at: datetime,
         "template_lang": template_lang,
         "day_from": day_from,
         "day_until": day_until,
+        "funnel_name": funnel_name,  # ДОБАВЛЕНО: сохраняем название воронки
     }
     if photo_file_id:
         data["photo_file_id"] = photo_file_id
@@ -917,6 +925,7 @@ def schedule_job(run_at: datetime,
         job_queue.run_once(job_send_distribution, run_at, data, job_id)
     )
     return job_id
+
 
 router = Router()
 
@@ -1498,7 +1507,12 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
 
         tmp = TEMP_CONTACTS_DIR / f"all_contacts_{uuid.uuid4().hex[:8]}.json"
         tmp.write_text(json.dumps(contacts, ensure_ascii=False), encoding="utf-8")
+        
+        
         await state.update_data(contacts=str(tmp))
+        
+        # Проверим что сохранилось
+        test_data = await state.get_data()
 
         cnt = len(contacts)
         min_secs = 40 * cnt
@@ -1518,6 +1532,109 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             ),
         )
         return
+
+    # Если конкретная воронка
+    if query.data.startswith("aud:f"):
+        print("DEBUG: Выбрана конкретная воронка")
+        data_state = await state.get_data()
+        funnel_map = data_state.get("funnel_map", {})
+        fid = query.data.split(":", 1)[1]
+        file_name = funnel_map.get(fid)
+        
+        print(f"DEBUG: fid = {fid}, file_name = {file_name}")
+
+        if not file_name:
+            await query.message.answer("❌ Не удалось определить файл статуса.")
+            return
+
+        snap_path = AMOCRM_DIR / "funnels.json"
+        if not snap_path.exists():
+            await query.message.answer("❌ Файл funnels.json не найден.")
+            return
+
+        snap = json.loads(snap_path.read_text("utf-8"))
+        status_info = next((f for f in snap["funnels"] if f["file"] == file_name), None)
+
+        if not status_info:
+            await query.message.answer("❌ Информация о статусе не найдена.")
+            return
+
+        status_name = status_info["name"]
+        pipeline_id = status_info["pipeline_id"]
+        status_id = status_info["status_id"]
+        local = AMOCRM_DIR / file_name
+
+        if not local.exists():
+            await query.message.edit_text("⏳ Скачиваю контакты…")
+            try:
+                leads = mgr.get_leads(pipeline_id, status_id)
+                if not leads:
+                    await query.message.answer(f"❌ В статусе '{status_name}' сделок нет.")
+                    return
+
+                cids = [c["id"] for l in leads for c in l["_embedded"]["contacts"]]
+                contacts_raw = mgr.get_contacts_bulk(cids)
+                contacts_data = []
+
+                for lead in leads:
+                    for c in lead["_embedded"]["contacts"]:
+                        co = contacts_raw.get(c["id"], {})
+                        phone_raw = mgr.extract_phone(co.get("custom_fields_values", []))
+                        name = co.get("name", "") or "Клиент"
+                        normalized = mgr.normalize_phone(phone_raw)
+
+                        if normalized:
+                            contacts_data.append({"phone": normalized, "name": name})
+                        else:
+                            write_error_with_phone_check(lead["id"], lead["name"], phone_raw, name)
+
+                # Уникализация
+                seen = set()
+                unique_contacts = []
+                for ct in contacts_data:
+                    if ct["phone"] not in seen:
+                        seen.add(ct["phone"])
+                        unique_contacts.append(ct)
+
+                local.write_text(json.dumps(unique_contacts, ensure_ascii=False), "utf-8")
+            except Exception as e:
+                await query.message.answer(f"❌ Ошибка при загрузке контактов: {e}")
+                return
+
+        contacts = json.loads(local.read_text("utf-8"))
+        tmp = TEMP_CONTACTS_DIR / f"{Path(file_name).stem}_{uuid.uuid4().hex[:8]}.json"
+        tmp.write_text(json.dumps(contacts, ensure_ascii=False), "utf-8")
+        
+        print(f"DEBUG: Saving contacts file: {tmp}")
+        print(f"DEBUG: Contacts count: {len(contacts)}")
+        
+        await state.update_data(contacts=str(tmp))
+        print("UPDATE: contacts записан в state для конкретной воронки!")
+        
+        # Проверим что сохранилось
+        test_data = await state.get_data()
+        print(f"DEBUG: After saving, state contains contacts: {test_data.get('contacts', 'NOT_FOUND')}")
+
+        cnt = len(contacts)
+        min_secs = 40 * cnt
+        max_secs = 345 * cnt
+        min_hms = str(timedelta(seconds=min_secs))
+        max_hms = str(timedelta(seconds=max_secs))
+
+        await query.message.edit_text(
+            f"✅ Статус: {status_name}\n"
+            f"📊 Контактов: {cnt}\n"
+            f"⏳ Оценка длительности рассылки(часы, минуты, секунды): от {min_hms} до {max_hms}\n"
+            "⚠️ Продолжить?",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [InlineKeyboardButton(text="✅ Да", callback_data="aud_f_yes")],
+                    [InlineKeyboardButton(text="⬅️ Отмена", callback_data="aud_f_no")],
+                ]
+            ),
+        )
+        return
+
 
     # Если конкретная воронка
     if query.data.startswith("aud:f"):
@@ -1609,6 +1726,12 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
 # ---------------------------------------------------------------------------
 # выбор шаблона после аудитории
 async def send_templates_list(where: Message | CallbackQuery, state: FSMContext):
+    print("DEBUG send_templates_list: Функция вызвана")
+    
+    # Проверим состояние
+    test_data = await state.get_data()
+    print(f"DEBUG send_templates_list: state contains contacts: {test_data.get('contacts', 'NOT_FOUND')}")
+    
     try:
         _, tpl_map, buttons = await fetch_templates(prefix="tpl_preview")
     except Exception as e:
@@ -1628,12 +1751,24 @@ async def send_templates_list(where: Message | CallbackQuery, state: FSMContext)
     # ключ, который ждёт cb_tpl_preview
     await state.update_data(templates_list=tpl_map)
     await state.set_state(Form.STATE_TEMPLATE_CHOOSE)
+    
+    # Проверим состояние после обновления
+    test_data2 = await state.get_data()
+    print(f"DEBUG send_templates_list: After update, state contains contacts: {test_data2.get('contacts', 'NOT_FOUND')}")
+
 
 @router.callback_query(F.data == "aud_f_yes")
 @admin_required
 async def cb_aud_f_yes(query: CallbackQuery, state: FSMContext):
     await query.answer()
+    print("DEBUG cb_aud_f_yes: Функция вызвана")
+    
+    # Проверим состояние перед вызовом
+    test_data = await state.get_data()
+    print(f"DEBUG cb_aud_f_yes: state contains contacts: {test_data.get('contacts', 'NOT_FOUND')}")
+    
     await send_templates_list(query, state)
+
 
 @router.callback_query(F.data == "aud_f_no")
 @admin_required
@@ -1908,26 +2043,63 @@ async def handle_time_range(message: Message, state: FSMContext):
 async def confirm_distribution(message: Message, state: FSMContext):
     preview = render_message_main()
     data = await state.get_data()
+    
+    print(f"DEBUG confirm_distribution: ALL STATE DATA = {data}")
+    
     run_at = datetime.fromisoformat(data["run_at"])
     day_from = data["day_from"]
     day_until = data["day_until"]
     
     # Информация о выбранном этапе
     stage_info = ""
+    funnel_name = ""
     contacts_file = data.get("contacts", "")
+    
+    print(f"DEBUG: contacts_file = '{contacts_file}'")
+    
+    if not contacts_file:
+        print("DEBUG: ОШИБКА! contacts_file пустое!")
+        await message.reply("❌ ОШИБКА: Файл контактов не найден. Попробуйте выбрать воронку заново.")
+        return
+    
     if contacts_file:
         file_name = Path(contacts_file).stem
-        if "all_contacts" not in file_name:
+        print(f"DEBUG: file_name = {file_name}")
+        
+        if "all_contacts" in file_name:
+            funnel_name = "Все воронки"
+            stage_info = "\n📊 Этап: Все воронки"
+            print(f"DEBUG: Detected all_contacts, funnel_name = {funnel_name}")
+        else:
             snap_path = AMOCRM_DIR / "funnels.json"
             if snap_path.exists():
                 try:
                     snap = json.loads(snap_path.read_text("utf-8"))
+                    print(f"DEBUG: Found {len(snap.get('funnels', []))} funnels in funnels.json")
+                    
                     for funnel in snap["funnels"]:
-                        if file_name in funnel["file"]:
+                        print(f"DEBUG: Checking funnel file '{funnel['file']}' against '{file_name}'")
+                        
+                        # ИСПРАВЛЕНО: Правильная логика сопоставления
+                        funnel_file_base = Path(funnel["file"]).stem
+                        print(f"DEBUG: funnel_file_base = '{funnel_file_base}'")
+                        if funnel_file_base in file_name or file_name in funnel_file_base:
+                            funnel_name = funnel["name"]
                             stage_info = f"\n📊 Этап: {funnel['name']}"
+                            print(f"DEBUG: MATCH! funnel_name = {funnel_name}")
                             break
-                except Exception:
+                    else:
+                        print("DEBUG: No matching funnel found")
+                except Exception as e:
+                    print(f"DEBUG: Exception reading funnels.json: {e}")
                     pass
+            else:
+                print("DEBUG: funnels.json not found")
+    
+    print(f"DEBUG: Final funnel_name = '{funnel_name}'")
+    
+    # Сохраняем название воронки в state
+    await state.update_data(funnel_name=funnel_name)
 
     when = "сейчас" if run_at < now_tz() + timedelta(seconds=30) else fmt_local(run_at)
     await message.reply(
@@ -1944,12 +2116,16 @@ async def confirm_distribution(message: Message, state: FSMContext):
     await state.set_state(Form.STATE_CONFIRM)
 
 
+
+
+
 @router.callback_query(F.data.startswith("confirm:"))
 @admin_required
 async def cb_confirm(query: CallbackQuery, state: FSMContext):
     await query.answer()
-    # correctly get_data()
     data = await state.get_data()
+    
+
 
     # Проверяем, что аудитория выбрана
     if "contacts" not in data:
@@ -1963,14 +2139,16 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
         await state.set_state(Form.STATE_MENU)
         return
 
-    # Получаем все необ
-    # ходимые поля из state
-    run_at_iso    = data.get("run_at")
-    day_from      = data.get("day_from", "00:00")
-    day_until     = data.get("day_until", "23:59")
+    # Получаем все необходимые поля из state
+    run_at_iso = data.get("run_at")
+    day_from = data.get("day_from", "00:00")
+    day_until = data.get("day_until", "23:59")
     contacts_file = Path(data["contacts"])
-    template_id   = data.get("chosen_tpl_id")
+    template_id = data.get("chosen_tpl_id")
     template_lang = data.get("chosen_tpl_lang", "ru")
+    funnel_name = data.get("funnel_name", "")
+
+
 
     if not run_at_iso or not template_id:
         await query.message.reply("❌ Не удалось получить время или шаблон. Повторите заново.")
@@ -1979,7 +2157,7 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
 
     run_at = datetime.fromisoformat(run_at_iso)
 
-    # Планируем задачу с учётом диапазона
+    # Планируем задачу с учётом диапазона и воронки
     job_id = schedule_job(
         run_at,
         contacts_file,
@@ -1987,7 +2165,8 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
         template_lang,
         day_from=day_from,
         day_until=day_until,
-        photo_file_id=data.get("photo_file_id")
+        photo_file_id=data.get("photo_file_id"),
+        funnel_name=funnel_name
     )
 
     # Форматируем время для пользователя
@@ -1997,11 +2176,12 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
         else fmt_local(run_at)
     )
 
-    # Отправляем финальное сообщение
-    # Отправляем финальное сообщение с кнопками главного меню
-# Отправляем финальное сообщение
+    # Добавляем информацию о воронке в сообщение подтверждения
+    funnel_info = f" для воронки '{funnel_name}'" if funnel_name else ""
+
+    
     await query.message.edit_text(
-        f"✅ Рассылка запланирована ({job_id}), время: {when}."
+        f"✅ Рассылка запланирована ({job_id}){funnel_info}, время: {when}."
     )
 
     # Отправляем главное меню
@@ -2012,6 +2192,28 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
     await state.set_state(Form.STATE_MENU)
 
 
+
+
+
+
+@router.callback_query(F.data == "aud_all:yes")
+@admin_required
+async def cb_aud_all_yes(query: CallbackQuery, state: FSMContext):
+    await query.answer()
+
+    
+    # Проверим состояние перед установкой
+    test_data = await state.get_data()
+
+    
+    # Устанавливаем funnel_name для всех воронок
+    await state.update_data(funnel_name="Все воронки")
+    
+    # Проверим что сохранилось
+    test_data2 = await state.get_data()
+
+    
+    await send_templates_list(query, state)
 
 
 
@@ -2051,6 +2253,10 @@ async def cb_job_detail(query: CallbackQuery, state: FSMContext):
     except Exception:
         contacts_count = "неизвестно"
 
+    # ДОБАВЛЕНО: получаем информацию о воронке
+    funnel_name = job.get("funnel_name", "")
+    funnel_info = f"\n📊 Воронка: {funnel_name}" if funnel_name else ""
+    
     buttons = [
         [
             InlineKeyboardButton(
@@ -2060,13 +2266,15 @@ async def cb_job_detail(query: CallbackQuery, state: FSMContext):
         [InlineKeyboardButton(text="❌ Отмена", callback_data="job_cancel")],
     ]
 
+    # УЛУЧШЕНО: добавляем информацию о воронке в детали задачи
     await query.message.edit_text(
         f"📅 Запланированная рассылка:\n"
         f"🕒 Время: {when}\n"
         f"👥 Контактов: {contacts_count}\n"
-        f"🆔 ID: {job_id}",
+        f"🆔 ID: {job_id}{funnel_info}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
+
 
 @router.callback_query(F.data.startswith("job_delete:"))
 @admin_required

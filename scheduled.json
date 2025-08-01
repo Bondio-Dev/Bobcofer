@@ -1,11 +1,12 @@
 [
   {
-    "job_id": "job_42b1731a",
-    "run_at": "2025-07-31T23:34:00.000004+00:00",
-    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_4de7295a.json",
+    "job_id": "job_d88bf884",
+    "run_at": "2025-08-01T00:14:14.887387+00:00",
+    "contacts": "C:\\work\\test\\twst1\\temp_contacts\\status_78511958_test_58f5347e.json",
     "template_id": "greeting",
     "template_lang": "ru",
     "day_from": "10:00",
-    "day_until": "22:00"
+    "day_until": "22:00",
+    "funnel_name": "test"
   }
 ]
