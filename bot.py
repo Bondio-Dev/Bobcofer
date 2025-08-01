@@ -1862,7 +1862,7 @@ async def cb_tpl_confirm(query: CallbackQuery, state: FSMContext):
         "📸 Хотите добавить фото к рассылке?",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[
-                [InlineKeyboardButton(text="📸 Добавить фото", callback_data="add_photo:yes")],
+ #               [InlineKeyboardButton(text="📸 Добавить фото", callback_data="add_photo:yes")],
                 [InlineKeyboardButton(text="📝 Без фото", callback_data="add_photo:no")],
             ]
         ),
