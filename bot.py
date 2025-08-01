@@ -800,7 +800,7 @@ async def job_send_distribution(context):
     except Exception:
         logger.exception("Ошибка в job_send_distribution")
 
-async def send_message_with_photo_async(dest: str, message: str, photo_file_id: str, funnel: str = "-") -> tuple[int, str]:
+'''async def send_message_with_photo_async(dest: str, message: str, photo_file_id: str, funnel: str = "-") -> tuple[int, str]:
     """Исправленная отправка сообщения с фото через WhatsApp"""
     try:
         # Форматируем номер телефона
@@ -893,7 +893,7 @@ async def send_message_with_photo_async(dest: str, message: str, photo_file_id: 
             writer = csv.writer(f)
             writer.writerow([ts, str(dest), "photo_whatsapp", funnel, "FAILED", error_msg[:100]])
         
-        return 500, error_msg
+        return 500, error_msg'''
 
 
 # 2.7) Расширение функции schedule_job для сохранения диапазона
