@@ -418,7 +418,34 @@ async def update_amocrm_funnels() -> str:
     while attempt < max_attempts:
         try:
             snap = await asyncio.to_thread(build_funnels_snapshot)
-            return f"✅ Найденно {len(snap['funnels'])} этапов, данные успешно синхронизированы с amo crm."
+            
+            # Список системных воронок для исключения
+            SYSTEM_FUNNELS = [
+                "Неразобранное",
+                "Успешно реализовано", 
+                "Закрыто и не реализовано"
+            ]
+            
+            # Фильтруем системные воронки
+            if "funnels" in snap:
+                original_count = len(snap["funnels"])
+                snap["funnels"] = [
+                    funnel for funnel in snap["funnels"] 
+                    if funnel.get("name", "") not in SYSTEM_FUNNELS
+                ]
+                filtered_count = len(snap["funnels"])
+                
+                # Сохраняем отфильтрованный снимок
+                snap_path = AMOCRM_DIR / "funnels.json"
+                snap_path.write_text(
+                    json.dumps(snap, ensure_ascii=False, indent=2),
+                    encoding="utf-8"
+                )
+                
+                return f"✅ Снято {filtered_count} этапов (исключено системных: {original_count - filtered_count}), контакты очищены."
+            else:
+                return f"✅ Снято {len(snap.get('funnels', []))} этапов, контакты очищены."
+                
         except Exception as e:
             attempt += 1
             logger.exception(f"build_funnels_snapshot попытка {attempt}/{max_attempts} неудачна: %s", e)
@@ -432,6 +459,8 @@ async def update_amocrm_funnels() -> str:
     
     # Этот код никогда не должен выполниться, но на всякий случай
     return "❌ Неожиданная ошибка при обновлении этапов"
+
+
 
 
 class JSONStore:

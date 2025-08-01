@@ -1,12 +1,6 @@
 {
   "funnels": [
     {
-      "name": "Неразобранное",
-      "file": "status_41764741_Неразобранное.json",
-      "pipeline_id": 4524700,
-      "status_id": 41764741
-    },
-    {
       "name": "из разных источников",
       "file": "status_53398730_из_разных_источников.json",
       "pipeline_id": 4524700,
@@ -47,18 +41,6 @@
       "file": "status_78511958_test.json",
       "pipeline_id": 4524700,
       "status_id": 78511958
-    },
-    {
-      "name": "Успешно реализовано",
-      "file": "status_142_Успешно_реализовано.json",
-      "pipeline_id": 4524700,
-      "status_id": 142
-    },
-    {
-      "name": "Закрыто и не реализовано",
-      "file": "status_143_Закрыто_и_не_реализовано.json",
-      "pipeline_id": 4524700,
-      "status_id": 143
     }
   ]
 }
