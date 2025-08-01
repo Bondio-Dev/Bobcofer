@@ -218,7 +218,7 @@ def load_reports():
     return stats
 
 MENU_BUTTONS = [
-    ["Выбрать воронку"],
+    ["Выбрать этап"],
     ["Просмотр шаблонов"],
     ["Просмотр запланированных"],
     ["Просмотр админов"],
@@ -341,7 +341,7 @@ class AmoCRMCategoryManager:
         return out
 
     def get_leads_all_statuses(self, pipeline_id: int) -> list[dict]:
-        """Возвращает все сделки во всех статусах указанной воронки."""
+        """Возвращает все сделки во всех статусах указанного этапа."""
         all_leads = []
         for status_id, _ in self.get_pipeline_statuses(pipeline_id):
             all_leads.extend(self.get_leads(pipeline_id, status_id))
@@ -401,7 +401,7 @@ from main import build_funnels_snapshot
 
 
 # ---------------------------------------------------------------------------
-# Обновляем список воронок: чистим папку и пишем funnels.json
+# Обновляем список вогроннок: чистим папку и пишем funnels.json
 async def update_amocrm_funnels() -> str:
     attempt = 0
     max_attempts = 3
@@ -418,7 +418,7 @@ async def update_amocrm_funnels() -> str:
     while attempt < max_attempts:
         try:
             snap = await asyncio.to_thread(build_funnels_snapshot)
-            return f"✅ Снято {len(snap['funnels'])} воронок, контакты очищены."
+            return f"✅ Найденно {len(snap['funnels'])} этапов, данные успешно синхронизированы с amo crm."
         except Exception as e:
             attempt += 1
             logger.exception(f"build_funnels_snapshot попытка {attempt}/{max_attempts} неудачна: %s", e)
@@ -431,7 +431,7 @@ async def update_amocrm_funnels() -> str:
                 return "❌ Сервер AmoCRM не отвечает, попробуйте снова через несколько минут"
     
     # Этот код никогда не должен выполниться, но на всякий случай
-    return "❌ Неожиданная ошибка при обновлении воронок"
+    return "❌ Неожиданная ошибка при обновлении этапов"
 
 
 class JSONStore:
@@ -799,8 +799,8 @@ async def handle_menu(message: Message, state: FSMContext):
     
     text = message.text
     
-    if text == "Выбрать воронку":
-        await message.answer("🔄 Обновляем воронки…")
+    if text == "Выбрать этап":
+        await message.answer("🔄 Обновляем этапы…")
         result = await update_amocrm_funnels()
         await ask_audience(message, state, result)
         return
@@ -1128,7 +1128,7 @@ async def ask_audience(
 
     snap = json.loads(snap_path.read_text("utf-8"))
     buttons = [
-        [InlineKeyboardButton(text="👥 Все воронки", callback_data="aud:all")]
+        [InlineKeyboardButton(text="👥 Все этапы", callback_data="aud:all")]
     ]
 
     funnel_map = {}
@@ -1309,7 +1309,7 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
             except Exception as e:
                 logger.warning("Не удалось удалить старый файл %s: %s", f, e)
 
-    # Если "Все воронки"
+    # Если "Все вонроннки"
     if query.data == "aud:all":
         contacts = []
         for file in AMOCRM_DIR.glob("*.json"):
@@ -1347,7 +1347,7 @@ async def cb_audience(query: CallbackQuery, state: FSMContext):
         )
         return
 
-    # Если конкретная воронка
+    # Если конкретная вонрнонка
     if query.data.startswith("aud:f"):
         data_state = await state.get_data()
         funnel_map = data_state.get("funnel_map", {})
@@ -1752,7 +1752,7 @@ async def cb_confirm(query: CallbackQuery, state: FSMContext):
 
 
 # ---------------------------------------------------------------------------
-# 3) Подтверждение рассылки по всем воронкам после выбора "Да"
+# 3) Подтверждение рассылки по всем вонрнонкам после выбора "Да"
 @router.callback_query(F.data.startswith("aud_all:"))
 @admin_required
 async def cb_aud_all_confirm(query: CallbackQuery, state: FSMContext):
